@@ -1,0 +1,35 @@
+syntax = "proto3";
+
+package nepulse;
+
+option go_package = "ne-pulse/proto;nepulsepb";
+
+// TelemetryPayload is a single sensor frame emitted by a mobile client.
+message TelemetryPayload {
+  string device_id = 1;
+  double latitude = 2;
+  double longitude = 3;
+  float acc_x = 4;
+  float acc_y = 5;
+  float acc_z = 6;
+  int64 timestamp_ms = 7;
+}
+
+// IngestResponse is returned once, when the client half-closes the stream
+// (client-streaming RPC semantics: N requests in, 1 response out).
+message IngestResponse {
+  int64 received_count = 1;
+  int64 accepted_count = 2;
+  int64 dropped_count = 3;
+  int64 first_timestamp_ms = 4;
+  int64 last_timestamp_ms = 5;
+  string status = 6;
+}
+
+// TelemetryIngest is the ingestion-facing gRPC service. StreamTelemetry
+// accepts a continuous client-side stream of TelemetryPayload frames from a
+// single mobile client connection and acknowledges receipt once the stream
+// closes.
+service TelemetryIngest {
+  rpc StreamTelemetry(stream TelemetryPayload) returns (IngestResponse);
+}

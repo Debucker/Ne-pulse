@@ -1,0 +1,14 @@
+node_modules
+.next
+out
+*.log
+
+# Real env files with actual secrets/URLs must never be committed — only
+# the *.example templates (see .env.production.example) are tracked.
+.env
+.env.local
+.env.development
+.env.development.local
+.env.production
+.env.production.local
+!.env*.example

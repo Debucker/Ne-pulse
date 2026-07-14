@@ -1,0 +1,14 @@
+# Go
+/tmp/
+*.exe
+*.test
+
+# Next.js / Node
+web/node_modules/
+web/.next/
+web/out/
+web/.env*.local
+
+# OS
+.DS_Store
+Thumbs.db
