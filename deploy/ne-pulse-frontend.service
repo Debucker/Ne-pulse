@@ -1,0 +1,29 @@
+[Unit]
+Description=NE-PULSE Frontend (Next.js standalone production server)
+Documentation=https://github.com/Debucker/Ne-pulse
+After=network.target ne-pulse-backend.service
+Wants=ne-pulse-backend.service
+
+[Service]
+Type=simple
+User={{SERVICE_USER}}
+Group={{SERVICE_USER}}
+WorkingDirectory={{WEB_DIR}}/.next/standalone
+Environment=NODE_ENV=production
+Environment=PORT=3000
+Environment=HOSTNAME=127.0.0.1
+ExecStart=/usr/bin/node {{WEB_DIR}}/.next/standalone/server.js
+
+Restart=always
+RestartSec=2
+StartLimitIntervalSec=0
+KillSignal=SIGTERM
+TimeoutStopSec=15
+
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths={{WEB_DIR}}
+
+[Install]
+WantedBy=multi-user.target

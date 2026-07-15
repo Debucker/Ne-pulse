@@ -2,15 +2,15 @@
 
 /**
  * NE-PULSE LITE — a dual-mode command center / hardware sensor node. No
- * framer-motion or lucide-react, but it *does* interface with the real Go
- * backend: the Mobile Sensor Node mode POSTs to the same
- * /api/ingress/hardware route (and worker pool / H3 aggregator) real
- * devices use, and the Command Center mode reads the same live
- * /ws/telemetry snapshot the main dashboard does (via useTelemetrySocket)
- * to render an aggregated cell-density heatmap instead of tracking
- * individual devices — thousands of per-device markers would crash the
- * Leaflet DOM. The map itself lives in ./LiteMap.tsx (dynamically imported
- * with ssr:false, since Leaflet touches `window` at import time).
+ * framer-motion or lucide-react. Unlike the main dashboard, Lite is
+ * deliberately single-user: it carries no aggregated peer/cell telemetry, so
+ * its map only ever renders the local user's own device node plus whatever
+ * rupture is active — the Mobile Sensor Node mode still POSTs real
+ * accelerometer readings to /api/ingress/hardware, but nothing tracks other
+ * devices back on-screen here. useTelemetrySocket is kept only for the
+ * header's Live/Disconnected indicator. The map itself lives in
+ * ./LiteMap.tsx (dynamically imported with ssr:false, since Leaflet touches
+ * `window` at import time).
  */
 
 import Link from "next/link";
@@ -18,7 +18,6 @@ import dynamic from "next/dynamic";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTelemetrySocket } from "@/lib/useTelemetrySocket";
 import { HARDWARE_INGRESS_URL } from "@/lib/config";
-import type { CellWeight } from "@/lib/types";
 import { computeCellId } from "./grid";
 import type { Region, Rupture } from "./types";
 
@@ -228,11 +227,10 @@ const LITE_STYLES = `
 
 export default function LiteDashboardPage() {
   const [isMobileNode, setIsMobileNode] = useState(false);
-  // The real telemetry pipeline: the same WebSocket the main dashboard
-  // uses, broadcasting H3-cell-aggregated device density — this is what
-  // makes a hardware frame POSTed from Mobile Sensor Node mode (or any
-  // real device) actually show up on this page's own map.
-  const { connected, snapshot } = useTelemetrySocket();
+  // Kept only for the header's Live/Disconnected indicator — Lite's map
+  // itself renders no other device's telemetry, so the snapshot payload
+  // isn't consumed here.
+  const { connected } = useTelemetrySocket();
 
   // Client-only detection: reading window/navigator during the initial
   // render would crash server-side, since this page is still SSR'd on
@@ -244,7 +242,7 @@ export default function LiteDashboardPage() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-[#020617] font-mono text-slate-100">
+    <div className="flex h-full flex-col bg-[#020617] font-mono text-slate-100">
       <style>{LITE_STYLES}</style>
 
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-800 bg-slate-950/80 px-4 py-3 sm:px-6">
@@ -291,7 +289,9 @@ export default function LiteDashboardPage() {
         </div>
       </div>
 
-      {isMobileNode ? <MobileSensorNode /> : <DesktopCommandCenter cells={snapshot?.cells ?? []} />}
+      <div className="flex-1 overflow-y-auto">
+        {isMobileNode ? <MobileSensorNode /> : <DesktopCommandCenter />}
+      </div>
     </div>
   );
 }
@@ -300,7 +300,7 @@ export default function LiteDashboardPage() {
 // Desktop mode: Command Center
 // ---------------------------------------------------------------------------
 
-function DesktopCommandCenter({ cells }: { cells: CellWeight[] }) {
+function DesktopCommandCenter() {
   const [home, setHome] = useState<Region>(UZBEKISTAN_REGIONS[0]);
   const [rupture, setRupture] = useState<Rupture | null>(null);
   const [now, setNow] = useState(() => Date.now());
@@ -344,9 +344,36 @@ function DesktopCommandCenter({ cells }: { cells: CellWeight[] }) {
 
   const phase = resolvePhase(homeReading ? homeReading.remaining : null, homeReading ? homeReading.mmi : null);
 
+  // Shared between the mobile bottom sheet and the desktop sidebar — same
+  // data, same markup, just mounted in whichever one of those two
+  // containers is actually visible at the current breakpoint.
+  const regionCountdownList = (
+    <>
+      <h2 className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-slate-500">
+        <WarnIcon /> Region Early-Warning Countdown
+      </h2>
+      {rupture ? (
+        sortedReadings.map((r) => (
+          <RegionCountdownCard
+            key={`${rupture.triggeredAt}-${r.region.name}`}
+            reading={r}
+            isHome={r.region.name === home.name}
+          />
+        ))
+      ) : (
+        <p className="rounded-lg border border-slate-800 bg-slate-900 p-4 text-xs text-slate-500">
+          No active rupture. Countdown meters activate the instant a rupture is triggered.
+        </p>
+      )}
+    </>
+  );
+
   return (
-    <main className="mx-auto flex max-w-7xl flex-col gap-4 p-4 sm:p-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
+    <main className="relative h-full overflow-hidden lg:mx-auto lg:flex lg:h-auto lg:max-w-7xl lg:flex-col lg:gap-4 lg:overflow-visible lg:p-6">
+      {/* Header/status bar — floats above the full-screen map with its own
+          translucent backdrop below lg; reverts to the original inline
+          header (first in flow, above the map) at lg+. */}
+      <div className="relative z-30 flex flex-wrap items-center justify-between gap-3 border-b border-slate-800/70 bg-slate-950/85 p-4 backdrop-blur-sm lg:static lg:border-0 lg:bg-transparent lg:p-0 lg:backdrop-blur-none">
         <div>
           <h1 className="text-lg font-semibold text-slate-100">Lite Command Center</h1>
           <p className="text-xs text-slate-500">Standalone dynamic rupture simulation — zero backend dependency</p>
@@ -363,54 +390,58 @@ function DesktopCommandCenter({ cells }: { cells: CellWeight[] }) {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_320px]">
-        <div className="relative h-[60vh] min-h-[420px] overflow-hidden rounded-lg border border-slate-800 bg-slate-950">
-          <div
-            className={`absolute right-3 top-3 z-10 flex items-center gap-1.5 rounded-md border px-2 py-1 text-[10px] font-medium ${
-              cells.length > 0
-                ? "border-cyan-500/50 bg-cyan-950/60 text-cyan-300"
-                : "border-slate-700 bg-slate-900/80 text-slate-500"
-            }`}
-          >
-            <span className={`h-1.5 w-1.5 rounded-full ${cells.length > 0 ? "bg-cyan-400" : "bg-slate-600"}`} />
-            {cells.length} active cell{cells.length === 1 ? "" : "s"}
+      {/* Full-bleed map layer: fills the entire Command Center viewport
+          below the `lg` breakpoint so touch panning/pinch-zoom gets the
+          whole screen to work with, and drops back into the original boxed
+          grid at lg+ — LiteMap itself, and the desktop layout around it,
+          are untouched. */}
+      <div className="absolute inset-0 z-0 lg:static lg:z-auto">
+        <div className="h-full lg:grid lg:grid-cols-[1fr_320px] lg:gap-4">
+          <div className="relative h-full overflow-hidden lg:h-[60vh] lg:min-h-[420px] lg:rounded-lg lg:border lg:border-slate-800 lg:bg-slate-950">
+            <LiteMap
+              home={home}
+              rupture={rupture}
+              elapsedSeconds={elapsedSeconds}
+              onMapDoubleClick={(lat, lng) => triggerRupture(lat, lng)}
+            />
           </div>
-          <LiteMap
-            home={home}
-            rupture={rupture}
-            elapsedSeconds={elapsedSeconds}
-            cells={cells}
-            onMapDoubleClick={(lat, lng) => triggerRupture(lat, lng)}
-          />
-        </div>
 
-        <aside className="flex h-[60vh] min-h-[420px] flex-col gap-3 overflow-y-auto pr-1">
-          <h2 className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-slate-500">
-            <WarnIcon /> Region Early-Warning Countdown
-          </h2>
-          {rupture ? (
-            sortedReadings.map((r) => (
-              <RegionCountdownCard
-                key={`${rupture.triggeredAt}-${r.region.name}`}
-                reading={r}
-                isHome={r.region.name === home.name}
-              />
-            ))
-          ) : (
-            <p className="rounded-lg border border-slate-800 bg-slate-900 p-4 text-xs text-slate-500">
-              No active rupture. Countdown meters activate the instant a rupture is triggered.
-            </p>
-          )}
-        </aside>
+          {/* Desktop-only sidebar column — the same region countdown data
+              reappears in the mobile bottom sheet below instead. */}
+          <aside className="hidden lg:flex lg:h-[60vh] lg:min-h-[420px] lg:flex-col lg:gap-3 lg:overflow-y-auto lg:pr-1">
+            {regionCountdownList}
+          </aside>
+        </div>
       </div>
 
-      <SurvivalChecklistPanel
-        phase={phase}
-        remaining={homeReading ? homeReading.remaining : null}
-        distanceKm={homeReading ? homeReading.distanceKm : null}
-        mmi={homeReading ? homeReading.mmi : null}
-        ruptureKey={rupture?.triggeredAt ?? null}
-      />
+      {/* Bottom sheet: region countdown + survival checklist, anchored to
+          the bottom of the screen below lg so the map's upper portion
+          stays bare and touchable. Hidden at lg+, where this same content
+          lives inline in the original boxed layout instead. */}
+      <div className="absolute inset-x-0 bottom-0 z-30 max-h-[45vh] overflow-y-auto rounded-t-2xl border-t border-slate-800/70 bg-slate-950/90 p-4 backdrop-blur-sm lg:hidden">
+        <div className="flex flex-col gap-3">{regionCountdownList}</div>
+        <div className="mt-3">
+          <SurvivalChecklistPanel
+            phase={phase}
+            remaining={homeReading ? homeReading.remaining : null}
+            distanceKm={homeReading ? homeReading.distanceKm : null}
+            mmi={homeReading ? homeReading.mmi : null}
+            ruptureKey={rupture?.triggeredAt ?? null}
+          />
+        </div>
+      </div>
+
+      {/* Desktop-only survival checklist, in normal document flow below
+          the grid — identical to the original layout. */}
+      <div className="hidden lg:block">
+        <SurvivalChecklistPanel
+          phase={phase}
+          remaining={homeReading ? homeReading.remaining : null}
+          distanceKm={homeReading ? homeReading.distanceKm : null}
+          mmi={homeReading ? homeReading.mmi : null}
+          ruptureKey={rupture?.triggeredAt ?? null}
+        />
+      </div>
     </main>
   );
 }

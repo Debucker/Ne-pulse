@@ -12,7 +12,7 @@ import { useEffect, useMemo } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { Circle, CircleMarker, MapContainer, Marker, TileLayer, Tooltip, useMap, useMapEvents } from "react-leaflet";
-import type { CellWeight } from "@/lib/types";
+import RuptureWaveOverlay from "@/components/dashboard/RuptureWaveOverlay";
 import { GRID_CELL_SIZE_DEG } from "./grid";
 import type { Region, Rupture } from "./types";
 
@@ -57,17 +57,6 @@ function seededRandoms(seed: number, count: number): number[] {
     out.push(s / 2147483647);
   }
   return out;
-}
-
-// Same scaling curve as the main dashboard's CommandMap — a cell with more
-// devices reporting renders as a bigger, more opaque cyan blob, so mass
-// activity reads as a heatmap rather than a wall of individual dots (which,
-// at real IoT scale, would crash the Leaflet DOM).
-function weightToRadius(weight: number): number {
-  return Math.min(4 + Math.sqrt(weight) * 2, 22);
-}
-function weightToOpacity(weight: number): number {
-  return Math.min(0.15 + weight * 0.03, 0.85);
 }
 
 const homeIcon = L.divIcon({
@@ -178,11 +167,10 @@ interface LiteMapProps {
   home: Region;
   rupture: Rupture | null;
   elapsedSeconds: number;
-  cells: CellWeight[];
   onMapDoubleClick: (lat: number, lng: number) => void;
 }
 
-export default function LiteMap({ home, rupture, elapsedSeconds, cells, onMapDoubleClick }: LiteMapProps) {
+export default function LiteMap({ home, rupture, elapsedSeconds, onMapDoubleClick }: LiteMapProps) {
   const wavefrontRadiusMeters = rupture ? elapsedSeconds * S_WAVE_MPS : 0;
   const showBurst = rupture !== null && elapsedSeconds < SENSOR_BURST_DURATION_S;
 
@@ -235,17 +223,27 @@ export default function LiteMap({ home, rupture, elapsedSeconds, cells, onMapDou
           instant the HUD countdown hits 0, since both derive from the same
           Haversine distance and velocity. */}
       {rupture && (
-        <Circle
-          center={[rupture.lat, rupture.lng]}
-          radius={Math.max(wavefrontRadiusMeters, 50)}
-          pathOptions={{
-            color: "#22d3ee",
-            weight: 1.5,
-            fillColor: "#22d3ee",
-            fillOpacity: 0.1,
-            interactive: false,
-          }}
-        />
+        <>
+          <Circle
+            center={[rupture.lat, rupture.lng]}
+            radius={Math.max(wavefrontRadiusMeters, 50)}
+            pathOptions={{
+              color: "#22d3ee",
+              weight: 1.5,
+              fillColor: "#22d3ee",
+              fillOpacity: 0.1,
+              interactive: false,
+            }}
+          />
+          {/* Trailing decay rings behind the precise cyan wavefront above —
+              red/opaque near the epicenter, fading and thickening with
+              distance to simulate inverse attenuation. */}
+          <RuptureWaveOverlay
+            epicenterLat={rupture.lat}
+            epicenterLng={rupture.lng}
+            waveRadiusMeters={Math.max(wavefrontRadiusMeters, 50)}
+          />
+        </>
       )}
 
       {/* Sensor burst — transient flashing nodes near the epicenter, selling
@@ -259,31 +257,6 @@ export default function LiteMap({ home, rupture, elapsedSeconds, cells, onMapDou
             pathOptions={{ color: "#22d3ee", fillColor: "#22d3ee", fillOpacity: 0.9, weight: 1, className: "nelite-blink" }}
           />
         ))}
-
-      {/* Live mass-activity heatmap — one CircleMarker per aggregated H3
-          cell (never per individual device: at real IoT scale that's
-          thousands of nodes, which would crash the Leaflet DOM). Radius and
-          opacity both scale with the cell's device-count weight, so dense
-          activity reads as a brighter, bigger cyan blob rather than a
-          cluttered swarm of dots. */}
-      {cells.map((cell) => (
-        <CircleMarker
-          key={cell.cellId}
-          center={[cell.lat, cell.lng]}
-          radius={weightToRadius(cell.weight)}
-          pathOptions={{
-            color: "#22d3ee",
-            fillColor: "#22d3ee",
-            fillOpacity: weightToOpacity(cell.weight),
-            weight: 1,
-            className: "nelite-device",
-          }}
-        >
-          <Tooltip direction="top" opacity={0.9}>
-            {cell.weight} active reading{cell.weight === 1 ? "" : "s"}
-          </Tooltip>
-        </CircleMarker>
-      ))}
 
       {/* Epicenter — stark red beacon, aggressive 1Hz pulsing radar glow */}
       {rupture && (

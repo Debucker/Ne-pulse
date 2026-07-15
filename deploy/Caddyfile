@@ -1,0 +1,29 @@
+{{DOMAIN}}, www.{{DOMAIN}} {
+	encode zstd gzip
+
+	# Caddy detects the `Connection: Upgrade` handshake and proxies
+	# WebSocket traffic transparently through reverse_proxy — no special
+	# wss:// handling needed here (unlike Nginx, which requires explicit
+	# `proxy_set_header Upgrade/Connection` directives). Both dashboard
+	# sockets and the hardware/control HTTP API live on the Go backend.
+	@backend path /ws/* /api/*
+	reverse_proxy @backend 127.0.0.1:8080 {
+		header_up X-Forwarded-For {remote_host}
+		header_up X-Forwarded-Proto {scheme}
+	}
+
+	# Everything else (the dashboard UI itself) -> the Next.js standalone
+	# server.
+	reverse_proxy 127.0.0.1:3000 {
+		header_up X-Forwarded-For {remote_host}
+		header_up X-Forwarded-Proto {scheme}
+	}
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+	}
+
+	log {
+		output file /var/log/caddy/ne-pulse-access.log
+	}
+}

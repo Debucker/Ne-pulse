@@ -19,6 +19,26 @@ body {
   font-family: inherit;
 }
 
+/* Leaflet's default zoom control buttons (26x26px) fall well short of the
+   ~44px touch-target guideline. Enlarge them only below the app's own `lg`
+   breakpoint (1024px, matching the dashboards' mobile/tablet full-screen-map
+   mode) — a mouse pointer on desktop doesn't need the extra hit area, and
+   larger buttons there would look out of place next to the boxed layout. */
+@media (max-width: 1023px) {
+  .leaflet-control-zoom a {
+    width: 44px;
+    height: 44px;
+    line-height: 44px;
+    font-size: 20px;
+  }
+
+  .leaflet-touch .leaflet-bar a {
+    width: 44px;
+    height: 44px;
+    line-height: 44px;
+  }
+}
+
 /* Brand-themed light-blue scrollbar (matches surface-accent, #3b82f6)
    everywhere, in place of the default browser gray. */
 * {
@@ -113,4 +133,29 @@ body {
 
 .sensor-node-flash {
   animation: sensor-node-flash 0.5s steps(1, jump-none) infinite;
+}
+
+/* Rupture wave rings (RuptureWaveOverlay): a scale + opacity "wobble" so
+   each hand-drawn SVG ring reads as an actively propagating wave rather
+   than a static gradient. `transform-box: fill-box` makes the browser
+   scale each circle around its own geometric center automatically,
+   regardless of where its cx/cy sits on the shared overlay canvas. Each
+   ring sets --ring-opacity inline (its distance-based decay value), so the
+   wobble oscillates around that ring's own baseline instead of a shared one. */
+@keyframes rupture-wobble {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: var(--ring-opacity, 0.6);
+  }
+  50% {
+    transform: scale(1.08);
+    opacity: calc(var(--ring-opacity, 0.6) * 0.6);
+  }
+}
+
+.rupture-wobble-ring {
+  animation: rupture-wobble 1.8s ease-in-out infinite;
+  transform-box: fill-box;
+  transform-origin: center;
 }

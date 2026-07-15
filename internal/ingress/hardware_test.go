@@ -107,6 +107,64 @@ func TestHardwareFrame_ToTelemetryFrame_RejectsMissingCoordinates(t *testing.T) 
 	}
 }
 
+func TestHardwareFrame_ToTelemetryFrame_AcceptsAccelerationWithinFiveG(t *testing.T) {
+	hw := HardwareFrame{DeviceID: "d1", Latitude: 41.3, Longitude: 69.24, AccX: 49.0, AccY: -49.0, AccZ: 9.8}
+	frame, err := hw.ToTelemetryFrame()
+	if err != nil {
+		t.Fatalf("ToTelemetryFrame() error = %v, want nil for in-range acceleration", err)
+	}
+	if frame.AccX != 49.0 || frame.AccY != -49.0 {
+		t.Errorf("frame accel = (%v,%v), want (49,-49)", frame.AccX, frame.AccY)
+	}
+}
+
+func TestHardwareFrame_ToTelemetryFrame_RejectsAccelerationAboveFiveG(t *testing.T) {
+	hw := HardwareFrame{DeviceID: "d1", Latitude: 41.3, Longitude: 69.24, AccZ: 60.0}
+	if _, err := hw.ToTelemetryFrame(); err != ErrAccelerationOutOfRange {
+		t.Errorf("error = %v, want ErrAccelerationOutOfRange", err)
+	}
+}
+
+func TestHardwareFrame_ToTelemetryFrame_RejectsAccelerationBelowNegativeFiveG(t *testing.T) {
+	hw := HardwareFrame{DeviceID: "d1", Latitude: 41.3, Longitude: 69.24, AccY: -60.0}
+	if _, err := hw.ToTelemetryFrame(); err != ErrAccelerationOutOfRange {
+		t.Errorf("error = %v, want ErrAccelerationOutOfRange", err)
+	}
+}
+
+func TestHardwareFrame_ToTelemetryFrame_RejectsOutOfRangeNestedAcceleration(t *testing.T) {
+	hw := HardwareFrame{
+		DeviceID: "d1", Latitude: 41.3, Longitude: 69.24,
+		Acceleration: &struct {
+			X float64 `json:"x"`
+			Y float64 `json:"y"`
+			Z float64 `json:"z"`
+		}{X: 0, Y: 0, Z: 100},
+	}
+	if _, err := hw.ToTelemetryFrame(); err != ErrAccelerationOutOfRange {
+		t.Errorf("error = %v, want ErrAccelerationOutOfRange", err)
+	}
+}
+
+func TestNewHardwareHandler_RejectsAccelerationOutOfRange(t *testing.T) {
+	pool := ingest.NewWorkerPool(16, 1, 0, func(workerID int) ingest.Consumer {
+		return ingest.ConsumerFunc(func(frame *ingest.TelemetryFrame) {})
+	})
+	ctx := newTestContext(t)
+	pool.Start(ctx)
+	defer pool.Stop()
+
+	body := []byte(`{"deviceId":"esp32-01","lat":41.3,"lng":69.24,"accX":0,"accY":0,"accZ":500}`)
+	req := httptest.NewRequest(http.MethodPost, "/api/ingress/hardware", bytes.NewReader(body))
+	rec := httptest.NewRecorder()
+
+	NewHardwareHandler(pool)(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Errorf("status = %d, want %d; body=%s", rec.Code, http.StatusBadRequest, rec.Body.String())
+	}
+}
+
 func TestNewHardwareHandler_AcceptsValidFrameAndSubmitsToPool(t *testing.T) {
 	var submitted *ingest.TelemetryFrame
 	pool := ingest.NewWorkerPool(16, 1, 0, func(workerID int) ingest.Consumer {

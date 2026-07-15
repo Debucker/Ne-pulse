@@ -1,7 +1,12 @@
 # Go
 /tmp/
+/bin/
 *.exe
 *.test
+
+# Production env (real secrets live on the server at /etc/ne-pulse/, but
+# ignore a locally-copied one too in case a checkout ever has one)
+.env.production
 
 # Next.js / Node
 web/node_modules/

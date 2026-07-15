@@ -7,6 +7,7 @@ import "leaflet/dist/leaflet.css";
 import type { CellWeight, WarningBroadcastPayload } from "@/lib/types";
 import type { DynamicRupture } from "@/lib/useDynamicRupture";
 import type { Region } from "@/lib/uzbekistanRegions";
+import RuptureWaveOverlay from "./RuptureWaveOverlay";
 
 const UZBEKISTAN_CENTER: [number, number] = [41.3, 64.5];
 const DEFAULT_ZOOM = 6;
@@ -165,17 +166,27 @@ export default function CommandMap({
       )}
 
       {dynamicRupture && (
-        <Circle
-          center={[dynamicRupture.epicenterLat, dynamicRupture.epicenterLng]}
-          radius={waveRadiusMeters}
-          pathOptions={{
-            color: "#22d3ee",
-            fillColor: "#22d3ee",
-            fillOpacity: 0.03,
-            weight: 1.5,
-            opacity: 0.55,
-          }}
-        />
+        <>
+          <Circle
+            center={[dynamicRupture.epicenterLat, dynamicRupture.epicenterLng]}
+            radius={waveRadiusMeters}
+            pathOptions={{
+              color: "#22d3ee",
+              fillColor: "#22d3ee",
+              fillOpacity: 0.03,
+              weight: 1.5,
+              opacity: 0.55,
+            }}
+          />
+          {/* Trailing decay rings behind the precise cyan wavefront above —
+              red/opaque near the epicenter, fading and thickening with
+              distance to simulate inverse attenuation. */}
+          <RuptureWaveOverlay
+            epicenterLat={dynamicRupture.epicenterLat}
+            epicenterLng={dynamicRupture.epicenterLng}
+            waveRadiusMeters={waveRadiusMeters}
+          />
+        </>
       )}
 
       {showBurst &&

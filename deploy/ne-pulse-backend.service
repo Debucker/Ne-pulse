@@ -1,0 +1,55 @@
+[Unit]
+Description=NE-PULSE Backend (Go telemetry ingestion + gRPC + dashboard/control/ingress HTTP)
+Documentation=https://github.com/Debucker/Ne-pulse
+After=network.target redis-server.service
+Wants=redis-server.service
+
+[Service]
+Type=simple
+User={{SERVICE_USER}}
+Group={{SERVICE_USER}}
+WorkingDirectory={{REPO_ROOT}}
+EnvironmentFile=/etc/ne-pulse/ne-pulse.env
+ExecStart={{REPO_ROOT}}/bin/ne-pulse-server \
+  -http-addr=127.0.0.1:${HTTP_PORT} \
+  -addr=127.0.0.1:${GRPC_PORT} \
+  -workers=${WORKERS} \
+  -queue=${QUEUE_DEPTH} \
+  -sim-mode=${SIM_MODE} \
+  -redis-addr=${REDIS_ADDR} \
+  -redis-password=${REDIS_PASSWORD} \
+  -redis-db=${REDIS_DB} \
+  -cors-allowed-origins=${CORS_ALLOWED_ORIGINS} \
+  -radar-threshold=${RADAR_THRESHOLD} \
+  -radar-coincidence-window=${RADAR_COINCIDENCE_WINDOW} \
+  -radar-cooldown=${RADAR_COOLDOWN} \
+  -rate-limit-per-second=${RATE_LIMIT_PER_SECOND} \
+  -rate-limit-burst=${RATE_LIMIT_BURST} \
+  -notify-webhook-url=${NOTIFY_WEBHOOK_URL} \
+  -notify-safety-margin=${NOTIFY_SAFETY_MARGIN}
+
+# The backend is the most sensitive part of this stack — if it goes down,
+# the whole early-warning grid goes dark. Restart unconditionally, on any
+# exit reason (crash, OOM-kill, a bad deploy), with only a short backoff.
+Restart=always
+RestartSec=2
+StartLimitIntervalSec=0
+
+# cmd/server already listens for SIGTERM and drains in-flight gRPC streams,
+# flushes the worker pool, and closes Redis cleanly before exiting on its
+# own (see waitForShutdownSignal / GracefulStop in cmd/server/main.go) — give
+# it real time to finish that instead of systemd escalating to SIGKILL
+# underneath it mid-drain.
+KillSignal=SIGTERM
+TimeoutStopSec=30
+
+# Hardening: this process only needs outbound network (Redis, notify
+# webhook) and its own working directory — no home directory, no write
+# access anywhere else on the filesystem.
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths={{REPO_ROOT}}
+
+[Install]
+WantedBy=multi-user.target

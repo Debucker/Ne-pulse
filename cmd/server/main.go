@@ -24,6 +24,7 @@ import (
 	"ne-pulse/internal/ingest"
 	"ne-pulse/internal/ingress"
 	"ne-pulse/internal/notify"
+	"ne-pulse/internal/ratelimit"
 	"ne-pulse/internal/solver"
 	"ne-pulse/internal/storage"
 	nepulsepb "ne-pulse/proto"
@@ -59,9 +60,12 @@ func main() {
 
 	corsAllowedOrigins := flag.String("cors-allowed-origins", defaultAllowedOrigins,
 		"comma-separated list of origins allowed to reach the HTTP API and websocket endpoints (CORS + WebSocket handshake Origin check)")
+	rateLimitPerSecond := flag.Float64("rate-limit-per-second", 5, "max HTTP requests/second allowed per client IP, across the dashboard/control/ingress HTTP API")
+	rateLimitBurst := flag.Int("rate-limit-burst", 5, "short burst allowance per client IP on top of the steady-state rate")
 	flag.Parse()
 
 	originAllowed := newOriginChecker(*corsAllowedOrigins)
+	limiter := ratelimit.New(*rateLimitPerSecond, *rateLimitBurst)
 
 	var store *storage.Store
 	if *simMode == "memory" {
@@ -164,8 +168,9 @@ func main() {
 	mux.HandleFunc("/api/simulate-rupture", control.SimulateRuptureHandler(controlHub, radar))
 	mux.HandleFunc("/api/ingress/hardware", ingress.NewHardwareHandler(pool))
 	mux.HandleFunc("/api/health", healthHandler(pool, store, radar, telemetryHub, controlHub))
-	httpServer := &http.Server{Addr: *httpAddr, Handler: withCORS(originAllowed, mux)}
+	httpServer := &http.Server{Addr: *httpAddr, Handler: withCORS(originAllowed, limiter.Middleware(mux))}
 
+	go limiter.Run(ctx)
 	go reportThroughput(pool, store, radar, aggregator, telemetryHub, controlHub)
 
 	go func() {
@@ -177,7 +182,7 @@ func main() {
 	}()
 
 	go func() {
-		log.Printf("ne-pulse dashboard/control/ingress HTTP server listening on %s (ws:/ws/telemetry, ws:/ws/control, POST:/api/simulate-rupture, POST:/api/ingress/hardware)", *httpAddr)
+		log.Printf("ne-pulse dashboard/control/ingress HTTP server listening on %s (ws:/ws/telemetry, ws:/ws/control, POST:/api/simulate-rupture, POST:/api/ingress/hardware, rate-limit=%.0f req/s burst=%d per IP)", *httpAddr, *rateLimitPerSecond, *rateLimitBurst)
 		if err := httpServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Fatalf("http server exited with error: %v", err)
 		}

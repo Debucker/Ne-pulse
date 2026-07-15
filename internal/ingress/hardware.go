@@ -11,6 +11,7 @@ import (
 	"errors"
 	"io"
 	"log"
+	"math"
 	"net/http"
 	"time"
 
@@ -21,6 +22,17 @@ import (
 // a real accelerometer sample (a few dozen bytes), but small enough that a
 // misbehaving client can't tie up a request goroutine buffering a huge body.
 const maxHardwarePayloadBytes = 8192
+
+// A real accelerometer reading — including gravity, for a device lying flat
+// — never exceeds a few g even under violent shaking or a dropped/thrown
+// device; ±5g is a generous outer bound on physical reality, used to reject
+// corrupted, malformed, or adversarially spoofed frames before they ever
+// reach the detector and skew its coincidence math.
+const (
+	maxAccelerationG           = 5.0
+	metersPerSecondSquaredPerG = 9.80665
+	maxAccelerationMS2         = maxAccelerationG * metersPerSecondSquaredPerG
+)
 
 // HardwareFrame is the raw JSON payload shape a physical edge device or a
 // browser client is expected to POST. Field names cover the two most
@@ -51,12 +63,21 @@ type HardwareFrame struct {
 	TimestampMs int64 `json:"timestampMs"`
 }
 
-// ErrMissingDeviceID and ErrMissingCoordinates flag malformed edge payloads
-// so callers can reject them before they ever reach the ingest pool.
+// ErrMissingDeviceID, ErrMissingCoordinates, and ErrAccelerationOutOfRange
+// flag malformed or physically-impossible edge payloads so callers can
+// reject them before they ever reach the ingest pool.
 var (
-	ErrMissingDeviceID    = errors.New("ingress: missing deviceId")
-	ErrMissingCoordinates = errors.New("ingress: missing lat/lng")
+	ErrMissingDeviceID        = errors.New("ingress: missing deviceId")
+	ErrMissingCoordinates     = errors.New("ingress: missing lat/lng")
+	ErrAccelerationOutOfRange = errors.New("ingress: acceleration outside of physical range (±5g)")
 )
+
+// validAcceleration rejects NaN/Inf (malformed JSON numbers can't produce
+// these, but a hand-crafted payload could via unusual encodings) and
+// anything outside ±5g.
+func validAcceleration(v float64) bool {
+	return !math.IsNaN(v) && !math.IsInf(v, 0) && v >= -maxAccelerationMS2 && v <= maxAccelerationMS2
+}
 
 // ToTelemetryFrame translates a raw hardware/browser payload into ne-pulse's
 // internal frame representation, acquiring a pooled frame the same way the
@@ -73,20 +94,21 @@ func (h HardwareFrame) ToTelemetryFrame() (*ingest.TelemetryFrame, error) {
 		return nil, ErrMissingCoordinates
 	}
 
+	accX, accY, accZ := h.AccX, h.AccY, h.AccZ
+	if h.Acceleration != nil {
+		accX, accY, accZ = h.Acceleration.X, h.Acceleration.Y, h.Acceleration.Z
+	}
+	if !validAcceleration(accX) || !validAcceleration(accY) || !validAcceleration(accZ) {
+		return nil, ErrAccelerationOutOfRange
+	}
+
 	frame := ingest.AcquireFrame()
 	frame.DeviceID = h.DeviceID
 	frame.Latitude = h.Latitude
 	frame.Longitude = h.Longitude
-
-	if h.Acceleration != nil {
-		frame.AccX = float32(h.Acceleration.X)
-		frame.AccY = float32(h.Acceleration.Y)
-		frame.AccZ = float32(h.Acceleration.Z)
-	} else {
-		frame.AccX = float32(h.AccX)
-		frame.AccY = float32(h.AccY)
-		frame.AccZ = float32(h.AccZ)
-	}
+	frame.AccX = float32(accX)
+	frame.AccY = float32(accY)
+	frame.AccZ = float32(accZ)
 
 	frame.TimestampMs = h.TimestampMs
 	if frame.TimestampMs == 0 {
