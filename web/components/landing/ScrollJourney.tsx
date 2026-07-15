@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import { motion, useMotionValueEvent, useScroll } from "framer-motion";
 import { Hexagon, Monitor, Radio, ShieldCheck, Smartphone } from "lucide-react";
 import JourneyPanel from "./JourneyPanel";
+import Reveal from "./Reveal";
 
 // A pinned, scroll-scrubbed walkthrough — the sticky panel stays put while
 // the outer container's extra height gives scrollYProgress (0-1) somewhere
@@ -108,10 +109,14 @@ export default function ScrollJourney() {
         </div>
       </section>
 
-      {/* Mobile/tablet (<lg): a normal static list, no scroll-jacking. The
-          sticky/pinned effect's whole payoff is JourneyPanel, which is
+      {/* Mobile/tablet (<lg): each step fades/rises in as it individually
+          scrolls into view (the same Reveal building block used everywhere
+          else on this page) instead of the desktop's pinned scroll-jacked
+          walkthrough. That version's whole payoff is JourneyPanel, which is
           already hidden below lg — scrubbing through 4.5 screens of scroll
-          for a visual the user never sees was pure dead space. */}
+          for a visual the user never sees was pure dead space, but a
+          perfectly static list felt lifeless, so this keeps the "settles in
+          as you scroll" feel at a fraction of the scroll distance. */}
       <section className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:hidden">
         <h2 className="text-3xl font-bold text-surface-text">Follow one reading, live</h2>
         <p className="mt-3 max-w-md text-surface-muted">
@@ -121,12 +126,12 @@ export default function ScrollJourney() {
 
         <div className="relative mt-8 flex flex-col gap-7 pl-8">
           <div className="absolute left-[7px] top-1 h-[calc(100%-8px)] w-px bg-white/10" />
-          {STEPS.map((step) => (
-            <div key={step.title} className="relative">
+          {STEPS.map((step, i) => (
+            <Reveal key={step.title} delay={i * 0.06} y={16} className="relative">
               <span className="absolute -left-8 top-0.5 h-3.5 w-3.5 rounded-full border-2 border-surface-accent bg-surface-accent" />
               <div className="font-semibold text-surface-text">{step.title}</div>
               <p className="mt-1.5 text-sm text-surface-muted">{step.body}</p>
-            </div>
+            </Reveal>
           ))}
         </div>
       </section>

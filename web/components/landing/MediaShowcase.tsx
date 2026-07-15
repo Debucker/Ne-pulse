@@ -17,7 +17,12 @@ export default function MediaShowcase() {
         <Reveal className="aspect-video">
           <SeismographLoop />
         </Reveal>
-        <Reveal className="aspect-video" delay={0.1}>
+        {/* Below sm, NetworkPulse's two node groups wrap onto two rows
+            (see NetworkPulse.tsx) instead of one cramped line — that needs
+            more height than a fixed 16:9 box allows, which was spilling
+            content out past the rounded border. Only lock to video aspect
+            from sm+, where the single-row layout comfortably fits it. */}
+        <Reveal className="sm:aspect-video" delay={0.1}>
           <NetworkPulse />
         </Reveal>
       </div>
