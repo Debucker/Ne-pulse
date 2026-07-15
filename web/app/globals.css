@@ -104,6 +104,26 @@ body {
   }
 }
 
+/* EarthquakeLoader's expanding rings — a plain CSS loop instead of a
+   Framer Motion keyframe-array `animate` (which restarts each cycle by
+   snapping straight back to its first value, reading as a flash). */
+@keyframes loader-ripple {
+  from {
+    width: 0;
+    height: 0;
+    opacity: 0.8;
+  }
+  to {
+    width: 96px;
+    height: 96px;
+    opacity: 0;
+  }
+}
+
+.animate-loader-ripple {
+  animation: loader-ripple 1.6s ease-out infinite;
+}
+
 .animate-broadcast-ring {
   /* backwards: during each ring's staggered animation-delay, apply the
      "from" keyframe's centering transform instead of the element's

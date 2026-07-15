@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import dynamic from "next/dynamic";
-import { Radio, TriangleAlert, WifiOff, Zap } from "lucide-react";
+import { ChevronUp, Radio, TriangleAlert, WifiOff, Zap } from "lucide-react";
 import { useTelemetrySocket } from "@/lib/useTelemetrySocket";
 import { useDynamicRupture } from "@/lib/useDynamicRupture";
 import { DEFAULT_HOME_REGION, UZBEKISTAN_REGIONS, type Region } from "@/lib/uzbekistanRegions";
@@ -41,6 +41,11 @@ export default function DashboardPage() {
   const dynamicRupture = useDynamicRupture(homeLocation);
   const [stressTest, setStressTest] = useState(false);
   const [stressCells, setStressCells] = useState<CellWeight[]>([]);
+  // The mobile bottom sheet starts collapsed to a one-line status strip so
+  // the map — the actual point of this screen — gets nearly the whole
+  // viewport by default, then auto-expands the instant a rupture actually
+  // needs attention.
+  const [sheetExpanded, setSheetExpanded] = useState(false);
 
   // Stress Test mode injects 300+ synthetic, CellWeight-shaped nodes into
   // the exact same rendering path real telemetry uses, so toggling it on
@@ -65,6 +70,11 @@ export default function DashboardPage() {
     const t = setTimeout(() => setShowLoader(false), MAX_CONNECT_WAIT_MS);
     return () => clearTimeout(t);
   }, [connected]);
+
+  useEffect(() => {
+    if (dynamicRupture.rupture) setSheetExpanded(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dynamicRupture.rupture?.triggeredAt]);
 
   // Restore the user's saved Home Location after mount only — reading
   // localStorage during the initial render would crash server-side, since
@@ -162,6 +172,14 @@ export default function DashboardPage() {
     </>
   );
 
+  const sheetSummary = dynamicRupture.rupture
+    ? dynamicRupture.remaining !== null
+      ? `${Math.max(0, Math.round(dynamicRupture.remaining))}s to impact${
+          dynamicRupture.mmi !== null ? ` · MMI ${dynamicRupture.mmi.toFixed(1)}` : ""
+        }`
+      : "Rupture active"
+    : "No active rupture — Safe Window";
+
   return (
     <main className="relative h-full overflow-hidden lg:flex lg:h-auto lg:min-h-full lg:flex-col lg:gap-4 lg:overflow-visible lg:p-6">
       {showLoader && <EarthquakeLoader fullscreen={false} label="Connecting to live sensor network…" />}
@@ -170,7 +188,7 @@ export default function DashboardPage() {
           translucent backdrop below lg (z-30, above the map's z-0); reverts
           to the original inline header (first in flow, above the map) at
           lg+, matching the original desktop layout exactly. */}
-      <div className="relative z-30 flex flex-wrap items-center justify-between gap-3 border-b border-surface-border/70 bg-surface-bg/85 p-4 backdrop-blur-sm lg:static lg:border-0 lg:bg-transparent lg:p-0 lg:backdrop-blur-none">
+      <div className="relative z-30 flex flex-wrap items-center justify-between gap-2 border-b border-surface-border/70 bg-surface-bg/85 p-3 backdrop-blur-sm lg:static lg:gap-3 lg:border-0 lg:bg-transparent lg:p-0 lg:backdrop-blur-none">
         <div>
           <h1 className="text-lg font-semibold text-surface-text">Telemetry Tracking Workspace</h1>
           <p className="text-xs text-surface-muted">Live sensor mesh — cell density and rupture alerts</p>
@@ -210,27 +228,44 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* Bottom sheet: region countdown + survival checklist + footer,
-          anchored to the bottom of the screen below lg so the map's upper
-          portion stays bare and touchable. This panel is the only part of
-          the mobile overlay that intercepts touches, and only where it
-          actually has content drawn — the map above it is fully reachable.
-          Hidden at lg+, where this same content lives inline in the
-          original boxed layout instead. */}
-      <div className="absolute inset-x-0 bottom-0 z-30 max-h-[45vh] overflow-y-auto rounded-t-2xl border-t border-surface-border/70 bg-surface-bg/90 p-4 backdrop-blur-sm lg:hidden">
-        <div className="flex flex-col gap-3">{regionCountdownList}</div>
-        <div className="mt-3">
-          <SurvivalChecklist
-            remaining={dynamicRupture.remaining}
-            severity={dynamicRupture.severity}
-            distanceKm={dynamicRupture.distanceKm}
-            mmi={dynamicRupture.mmi}
-            ruptureKey={dynamicRupture.rupture?.triggeredAt ?? null}
+      {/* Bottom sheet: collapsed by default to a one-line status strip so
+          the map keeps almost the entire screen — it auto-expands the
+          instant a rupture actually needs attention (see the effect above),
+          and can be tapped open/closed manually any other time. Only the
+          strip (or, when expanded, the panel below it) intercepts touches;
+          the map above it is always fully reachable. Hidden at lg+, where
+          this content lives inline in the original boxed layout instead. */}
+      <div className="absolute inset-x-0 bottom-0 z-30 overflow-hidden rounded-t-2xl border-t border-surface-border/70 bg-surface-bg/90 backdrop-blur-sm lg:hidden">
+        <button
+          type="button"
+          onClick={() => setSheetExpanded((v) => !v)}
+          aria-expanded={sheetExpanded}
+          className="flex w-full items-center justify-between gap-2 px-4 py-3 text-left"
+        >
+          <span className="truncate text-xs font-medium text-surface-text">{sheetSummary}</span>
+          <ChevronUp
+            size={16}
+            className={`shrink-0 text-surface-muted transition-transform ${sheetExpanded ? "rotate-180" : ""}`}
           />
-        </div>
-        <div className="mt-3 flex items-center justify-between border-t border-surface-border pt-3 text-xs text-surface-muted">
-          {footerRow}
-        </div>
+        </button>
+
+        {sheetExpanded && (
+          <div className="max-h-[42vh] overflow-y-auto px-4 pb-4">
+            <div className="flex flex-col gap-3">{regionCountdownList}</div>
+            <div className="mt-3">
+              <SurvivalChecklist
+                remaining={dynamicRupture.remaining}
+                severity={dynamicRupture.severity}
+                distanceKm={dynamicRupture.distanceKm}
+                mmi={dynamicRupture.mmi}
+                ruptureKey={dynamicRupture.rupture?.triggeredAt ?? null}
+              />
+            </div>
+            <div className="mt-3 flex items-center justify-between border-t border-surface-border pt-3 text-xs text-surface-muted">
+              {footerRow}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Desktop-only survival checklist + footer, in normal document flow

@@ -20,11 +20,6 @@ export default function MediaShowcase() {
         <Reveal className="aspect-video" delay={0.1}>
           <NetworkPulse />
         </Reveal>
-        {/* Production video slot: drop a <video> or <iframe> embed here */}
-        <Reveal
-          className="aspect-video overflow-hidden rounded-xl border border-white/10 bg-slate-900/50 md:col-span-2"
-          delay={0.2}
-        />
       </div>
     </section>
   );

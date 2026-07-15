@@ -10,7 +10,12 @@ export const metadata: Metadata = {
 
 export default function DashboardLayout({ children }: { children: ReactNode }) {
   return (
-    <div className="flex h-screen flex-col">
+    // 100dvh (not 100vh/h-screen) tracks the *actual* visible viewport on
+    // mobile browsers as their address bar shows/hides — h-screen's static
+    // 100vh overestimates available height while that chrome is visible,
+    // which was silently pushing this layout's content taller than the
+    // real screen and squeezing the dashboards' maps down to a sliver.
+    <div className="flex h-[100dvh] flex-col">
       <DashboardNav />
       <div className="flex-1 overflow-y-auto">{children}</div>
     </div>

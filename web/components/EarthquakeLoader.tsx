@@ -1,6 +1,5 @@
 "use client";
 
-import { motion } from "framer-motion";
 import { ActivitySquare } from "lucide-react";
 
 // The site's one loading visual, reused everywhere something needs a beat
@@ -8,6 +7,14 @@ import { ActivitySquare } from "lucide-react";
 // brand mark, on an infinite loop — the same physical metaphor (fast
 // harmless wave, slower destructive one) used throughout the product,
 // rather than a generic spinner.
+//
+// The rings are driven by a plain CSS @keyframes loop (see
+// .animate-loader-ripple in globals.css), not a Framer Motion `animate`
+// keyframe array — a JS-driven repeat restarts by snapping straight back to
+// the first keyframe's values, which reads as a visible flash at the end of
+// every cycle. A native CSS animation loops at the compositor level with no
+// such restart artifact (the same reasoning behind animate-ripple and
+// animate-broadcast-ring elsewhere in this codebase).
 export default function EarthquakeLoader({
   label = "Calibrating sensors…",
   fullscreen = true,
@@ -22,15 +29,10 @@ export default function EarthquakeLoader({
       } inset-0 z-[100] flex flex-col items-center justify-center gap-6 bg-surface-bg`}
     >
       <div className="relative flex h-24 w-24 items-center justify-center">
-        <motion.span
-          className="absolute rounded-full border-2 border-cyan-400"
-          animate={{ width: [0, 96], height: [0, 96], opacity: [0.8, 0] }}
-          transition={{ duration: 1.6, repeat: Infinity, ease: "easeOut" }}
-        />
-        <motion.span
-          className="absolute rounded-full border-2 border-surface-danger"
-          animate={{ width: [0, 96], height: [0, 96], opacity: [0.8, 0] }}
-          transition={{ duration: 1.6, repeat: Infinity, ease: "easeOut", delay: 0.5 }}
+        <span className="absolute rounded-full border-2 border-cyan-400 animate-loader-ripple" />
+        <span
+          className="absolute rounded-full border-2 border-surface-danger animate-loader-ripple"
+          style={{ animationDelay: "0.5s" }}
         />
         <div className="relative z-10 flex h-12 w-12 items-center justify-center rounded-xl border border-white/10 bg-slate-900/80">
           <ActivitySquare size={24} className="text-surface-accent" />

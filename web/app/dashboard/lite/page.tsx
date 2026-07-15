@@ -245,32 +245,24 @@ export default function LiteDashboardPage() {
     <div className="flex h-full flex-col bg-[#020617] font-mono text-slate-100">
       <style>{LITE_STYLES}</style>
 
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-800 bg-slate-950/80 px-4 py-3 sm:px-6">
-        <div className="flex items-center gap-3">
-          <span className="flex h-7 w-7 items-center justify-center rounded-md border border-cyan-500/40 bg-cyan-500/10 text-xs font-bold text-cyan-400">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 bg-slate-950/80 px-3 py-2.5 sm:gap-3 sm:px-6 sm:py-3">
+        <div className="flex items-center gap-2 sm:gap-3">
+          <Link
+            href="/"
+            aria-label="Return to main platform"
+            className="flex h-7 w-7 flex-none items-center justify-center rounded-md border border-cyan-500/40 bg-cyan-500/10 text-xs font-bold text-cyan-400 transition hover:border-cyan-400"
+          >
             NP
-          </span>
+          </Link>
           <div>
             <div className="text-sm font-semibold text-slate-100">NE-PULSE LITE</div>
             <div className="text-[10px] uppercase tracking-wide text-slate-500">
               {isMobileNode ? "Active Sensor Node" : "Command Center"}
             </div>
           </div>
-          <Link
-            href="/"
-            className="ml-2 hidden items-center gap-1 rounded-md border border-slate-700 bg-slate-900 px-2.5 py-1.5 text-xs font-medium text-slate-400 transition hover:border-cyan-500/60 hover:text-cyan-400 sm:flex"
-          >
-            ← Return to Main Platform
-          </Link>
         </div>
 
         <div className="flex items-center gap-2">
-          <Link
-            href="/"
-            className="flex items-center gap-1 rounded-md border border-slate-700 bg-slate-900 px-2.5 py-1.5 text-xs font-medium text-slate-400 transition hover:border-cyan-500/60 hover:text-cyan-400 sm:hidden"
-          >
-            ← Main Platform
-          </Link>
           <span
             className={`hidden items-center gap-1.5 text-xs font-medium uppercase tracking-wide sm:flex ${
               connected ? "text-cyan-400" : "text-slate-500"
@@ -282,9 +274,12 @@ export default function LiteDashboardPage() {
           <button
             type="button"
             onClick={() => setIsMobileNode((v) => !v)}
-            className="flex items-center gap-2 rounded-md border border-slate-700 bg-slate-900 px-3 py-1.5 text-xs font-medium text-slate-200 transition hover:border-cyan-500/60 hover:text-cyan-400"
+            className="flex items-center gap-2 rounded-md border border-slate-700 bg-slate-900 px-2.5 py-1.5 text-xs font-medium text-slate-200 transition hover:border-cyan-500/60 hover:text-cyan-400 sm:px-3"
           >
-            Switch to {isMobileNode ? "Command Center View" : "Active Sensor Node View"}
+            <span className="sm:hidden">{isMobileNode ? "Command Center" : "Sensor Node"}</span>
+            <span className="hidden sm:inline">
+              Switch to {isMobileNode ? "Command Center View" : "Active Sensor Node View"}
+            </span>
           </button>
         </div>
       </div>
@@ -304,12 +299,21 @@ function DesktopCommandCenter() {
   const [home, setHome] = useState<Region>(UZBEKISTAN_REGIONS[0]);
   const [rupture, setRupture] = useState<Rupture | null>(null);
   const [now, setNow] = useState(() => Date.now());
+  // The mobile bottom sheet starts collapsed to a one-line status strip so
+  // the map gets nearly the whole screen by default, then auto-expands the
+  // instant a rupture actually needs attention.
+  const [sheetExpanded, setSheetExpanded] = useState(false);
 
   useEffect(() => {
     if (!rupture) return;
     const interval = setInterval(() => setNow(Date.now()), 100);
     return () => clearInterval(interval);
   }, [rupture]);
+
+  useEffect(() => {
+    if (rupture) setSheetExpanded(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rupture?.triggeredAt]);
 
   // lat/lng explicit -> a manual double-click-on-map trigger at that exact
   // point; omitted -> a random epicenter anywhere inside Uzbekistan.
@@ -344,6 +348,12 @@ function DesktopCommandCenter() {
 
   const phase = resolvePhase(homeReading ? homeReading.remaining : null, homeReading ? homeReading.mmi : null);
 
+  const sheetSummary = rupture
+    ? homeReading
+      ? `${Math.max(0, Math.round(homeReading.remaining))}s to impact · MMI ${homeReading.mmi.toFixed(1)}`
+      : "Rupture active"
+    : "No active rupture — Safe Window";
+
   // Shared between the mobile bottom sheet and the desktop sidebar — same
   // data, same markup, just mounted in whichever one of those two
   // containers is actually visible at the current breakpoint.
@@ -373,7 +383,7 @@ function DesktopCommandCenter() {
       {/* Header/status bar — floats above the full-screen map with its own
           translucent backdrop below lg; reverts to the original inline
           header (first in flow, above the map) at lg+. */}
-      <div className="relative z-30 flex flex-wrap items-center justify-between gap-3 border-b border-slate-800/70 bg-slate-950/85 p-4 backdrop-blur-sm lg:static lg:border-0 lg:bg-transparent lg:p-0 lg:backdrop-blur-none">
+      <div className="relative z-30 flex flex-wrap items-center justify-between gap-2 border-b border-slate-800/70 bg-slate-950/85 p-3 backdrop-blur-sm lg:static lg:gap-3 lg:border-0 lg:bg-transparent lg:p-0 lg:backdrop-blur-none">
         <div>
           <h1 className="text-lg font-semibold text-slate-100">Lite Command Center</h1>
           <p className="text-xs text-slate-500">Standalone dynamic rupture simulation — zero backend dependency</p>
@@ -414,21 +424,36 @@ function DesktopCommandCenter() {
         </div>
       </div>
 
-      {/* Bottom sheet: region countdown + survival checklist, anchored to
-          the bottom of the screen below lg so the map's upper portion
-          stays bare and touchable. Hidden at lg+, where this same content
-          lives inline in the original boxed layout instead. */}
-      <div className="absolute inset-x-0 bottom-0 z-30 max-h-[45vh] overflow-y-auto rounded-t-2xl border-t border-slate-800/70 bg-slate-950/90 p-4 backdrop-blur-sm lg:hidden">
-        <div className="flex flex-col gap-3">{regionCountdownList}</div>
-        <div className="mt-3">
-          <SurvivalChecklistPanel
-            phase={phase}
-            remaining={homeReading ? homeReading.remaining : null}
-            distanceKm={homeReading ? homeReading.distanceKm : null}
-            mmi={homeReading ? homeReading.mmi : null}
-            ruptureKey={rupture?.triggeredAt ?? null}
-          />
-        </div>
+      {/* Bottom sheet: collapsed by default to a one-line status strip so
+          the map keeps almost the entire screen — it auto-expands the
+          instant a rupture actually needs attention, and can be tapped
+          open/closed manually any other time. Hidden at lg+, where this
+          content lives inline in the original boxed layout instead. */}
+      <div className="absolute inset-x-0 bottom-0 z-30 overflow-hidden rounded-t-2xl border-t border-slate-800/70 bg-slate-950/90 backdrop-blur-sm lg:hidden">
+        <button
+          type="button"
+          onClick={() => setSheetExpanded((v) => !v)}
+          aria-expanded={sheetExpanded}
+          className="flex w-full items-center justify-between gap-2 px-4 py-3 text-left"
+        >
+          <span className="truncate text-xs font-medium text-slate-100">{sheetSummary}</span>
+          <ChevronIcon className={`shrink-0 text-slate-500 transition-transform ${sheetExpanded ? "" : "rotate-180"}`} />
+        </button>
+
+        {sheetExpanded && (
+          <div className="max-h-[42vh] overflow-y-auto px-4 pb-4">
+            <div className="flex flex-col gap-3">{regionCountdownList}</div>
+            <div className="mt-3">
+              <SurvivalChecklistPanel
+                phase={phase}
+                remaining={homeReading ? homeReading.remaining : null}
+                distanceKm={homeReading ? homeReading.distanceKm : null}
+                mmi={homeReading ? homeReading.mmi : null}
+                ruptureKey={rupture?.triggeredAt ?? null}
+              />
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Desktop-only survival checklist, in normal document flow below

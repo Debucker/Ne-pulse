@@ -8,12 +8,18 @@ const TRAVEL_DURATION = 2.2;
 
 export default function NetworkPulse() {
   return (
-    <div className="flex h-full w-full flex-col justify-center gap-6 rounded-xl border border-white/10 bg-slate-950 p-6">
-      <div className="flex items-center justify-between">
-        <EdgeNode icon={<Smartphone size={22} />} label="Phone" />
-        <EdgeNode icon={<Cpu size={22} />} label="Microcontroller" />
+    <div className="flex h-full w-full flex-col justify-center gap-6 rounded-xl border border-white/10 bg-slate-950 p-4 sm:p-6">
+      {/* Below sm, the connector line is dropped and the two node groups
+          just wrap/center — cramming a Phone + Microcontroller + connector
+          + Command Center into one unbroken row left almost no breathing
+          room on narrow phones. */}
+      <div className="flex flex-wrap items-center justify-center gap-4 sm:flex-nowrap sm:justify-between sm:gap-0">
+        <div className="flex items-center gap-3 sm:contents">
+          <EdgeNode icon={<Smartphone size={22} />} label="Phone" />
+          <EdgeNode icon={<Cpu size={22} />} label="Microcontroller" />
+        </div>
 
-        <div className="relative mx-2 h-px flex-1 bg-white/10">
+        <div className="relative mx-2 hidden h-px flex-1 bg-white/10 sm:block">
           <motion.span
             className="absolute -top-1 h-2 w-2 rounded-full bg-surface-accent shadow-[0_0_8px_2px_rgba(59,130,246,0.6)]"
             animate={{ left: ["0%", "100%"], opacity: [0, 1, 1, 0] }}

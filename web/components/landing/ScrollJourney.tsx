@@ -49,55 +49,87 @@ export default function ScrollJourney() {
   });
 
   return (
-    <section ref={containerRef} className="relative" style={{ height: `${STEPS.length * 90}vh` }}>
-      <div className="sticky top-0 flex h-screen items-center overflow-hidden">
-        <div className="mx-auto grid w-full max-w-7xl grid-cols-1 gap-12 px-4 sm:px-6 lg:grid-cols-2 lg:px-8">
-          <div>
-            <h2 className="text-3xl font-bold text-surface-text">Follow one reading, live</h2>
-            <p className="mt-3 max-w-md text-surface-muted">
-              Scroll to trace a single sensor reading from the first tremor to a warning
-              on someone&apos;s screen.
-            </p>
+    <>
+      {/* Desktop/tablet (lg+): the full pinned, scroll-scrubbed walkthrough.
+          `hidden` below lg means this generates no box at all there, so its
+          450vh scroll-height reservation never affects mobile page length. */}
+      <section
+        ref={containerRef}
+        className="relative hidden lg:block"
+        style={{ height: `${STEPS.length * 90}vh` }}
+      >
+        <div className="sticky top-0 flex h-screen items-center overflow-hidden">
+          <div className="mx-auto grid w-full max-w-7xl grid-cols-1 gap-12 px-4 sm:px-6 lg:grid-cols-2 lg:px-8">
+            <div>
+              <h2 className="text-3xl font-bold text-surface-text">Follow one reading, live</h2>
+              <p className="mt-3 max-w-md text-surface-muted">
+                Scroll to trace a single sensor reading from the first tremor to a warning
+                on someone&apos;s screen.
+              </p>
 
-            <div className="relative mt-10 flex flex-col gap-9 pl-8">
-              <div className="absolute left-[7px] top-1 h-[calc(100%-8px)] w-px bg-white/10" />
-              <motion.div
-                className="absolute left-[7px] top-1 h-[calc(100%-8px)] w-px origin-top bg-surface-accent"
-                style={{ scaleY: scrollYProgress }}
-              />
+              <div className="relative mt-10 flex flex-col gap-9 pl-8">
+                <div className="absolute left-[7px] top-1 h-[calc(100%-8px)] w-px bg-white/10" />
+                <motion.div
+                  className="absolute left-[7px] top-1 h-[calc(100%-8px)] w-px origin-top bg-surface-accent"
+                  style={{ scaleY: scrollYProgress }}
+                />
 
-              {STEPS.map((step, i) => (
-                <div key={step.title} className="relative">
-                  <span
-                    className={`absolute -left-8 top-0.5 h-3.5 w-3.5 rounded-full border-2 transition-colors duration-300 ${
-                      i <= active ? "border-surface-accent bg-surface-accent" : "border-white/20 bg-slate-950"
-                    }`}
-                  />
-                  <div
-                    className={`font-semibold transition-colors duration-300 ${
-                      i === active ? "text-surface-text" : "text-surface-muted"
-                    }`}
-                  >
-                    {step.title}
-                  </div>
-                  {i === active && (
-                    <motion.p
-                      initial={{ opacity: 0, y: 6 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ duration: 0.35 }}
-                      className="mt-1.5 text-sm text-surface-muted"
+                {STEPS.map((step, i) => (
+                  <div key={step.title} className="relative">
+                    <span
+                      className={`absolute -left-8 top-0.5 h-3.5 w-3.5 rounded-full border-2 transition-colors duration-300 ${
+                        i <= active ? "border-surface-accent bg-surface-accent" : "border-white/20 bg-slate-950"
+                      }`}
+                    />
+                    <div
+                      className={`font-semibold transition-colors duration-300 ${
+                        i === active ? "text-surface-text" : "text-surface-muted"
+                      }`}
                     >
-                      {step.body}
-                    </motion.p>
-                  )}
-                </div>
-              ))}
+                      {step.title}
+                    </div>
+                    {i === active && (
+                      <motion.p
+                        initial={{ opacity: 0, y: 6 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.35 }}
+                        className="mt-1.5 text-sm text-surface-muted"
+                      >
+                        {step.body}
+                      </motion.p>
+                    )}
+                  </div>
+                ))}
+              </div>
             </div>
-          </div>
 
-          <JourneyPanel active={active} />
+            <JourneyPanel active={active} />
+          </div>
         </div>
-      </div>
-    </section>
+      </section>
+
+      {/* Mobile/tablet (<lg): a normal static list, no scroll-jacking. The
+          sticky/pinned effect's whole payoff is JourneyPanel, which is
+          already hidden below lg — scrubbing through 4.5 screens of scroll
+          for a visual the user never sees was pure dead space. */}
+      <section className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:hidden">
+        <h2 className="text-3xl font-bold text-surface-text">Follow one reading, live</h2>
+        <p className="mt-3 max-w-md text-surface-muted">
+          Trace a single sensor reading from the first tremor to a warning on someone&apos;s
+          screen.
+        </p>
+
+        <div className="relative mt-8 flex flex-col gap-7 pl-8">
+          <div className="absolute left-[7px] top-1 h-[calc(100%-8px)] w-px bg-white/10" />
+          {STEPS.map((step) => (
+            <div key={step.title} className="relative">
+              <span className="absolute -left-8 top-0.5 h-3.5 w-3.5 rounded-full border-2 border-surface-accent bg-surface-accent" />
+              <div className="font-semibold text-surface-text">{step.title}</div>
+              <p className="mt-1.5 text-sm text-surface-muted">{step.body}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+    </>
   );
 }
