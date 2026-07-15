@@ -12,6 +12,9 @@ interface TriggerButtonProps {
   // "the old one is gone, a new one is coming" rather than leaving the old
   // rupture on screen until the new one happens to arrive.
   onTrigger: () => Promise<void>;
+  // Smaller padding/text/icon and a shorter label — for the mobile action
+  // row, where this sits alongside the Stress Test toggle in one line.
+  compact?: boolean;
 }
 
 /**
@@ -20,7 +23,7 @@ interface TriggerButtonProps {
  * magnitude bookkeeping live in useDynamicRupture — this component only
  * owns the button's own idle/sending/sent/error presentation.
  */
-export default function TriggerButton({ onTrigger }: TriggerButtonProps) {
+export default function TriggerButton({ onTrigger, compact = false }: TriggerButtonProps) {
   const [status, setStatus] = useState<Status>("idle");
 
   async function handleClick() {
@@ -34,21 +37,32 @@ export default function TriggerButton({ onTrigger }: TriggerButtonProps) {
     setTimeout(() => setStatus("idle"), 2500);
   }
 
-  const content: Record<Status, { label: string; icon: ReactNode }> = {
-    idle: { label: "Trigger Random Rupture", icon: <Zap size={16} /> },
-    sending: { label: "Triggering...", icon: <Loader2 size={16} className="animate-spin" /> },
-    sent: { label: "Rupture Dispatched", icon: <Radio size={16} /> },
-    error: { label: "Failed — is the server running?", icon: <TriangleAlert size={16} /> },
+  const iconSize = compact ? 14 : 16;
+  const content: Record<Status, { label: string; compactLabel: string; icon: ReactNode }> = {
+    idle: { label: "Trigger Random Rupture", compactLabel: "Trigger Rupture", icon: <Zap size={iconSize} /> },
+    sending: {
+      label: "Triggering...",
+      compactLabel: "Triggering…",
+      icon: <Loader2 size={iconSize} className="animate-spin" />,
+    },
+    sent: { label: "Rupture Dispatched", compactLabel: "Dispatched", icon: <Radio size={iconSize} /> },
+    error: {
+      label: "Failed — is the server running?",
+      compactLabel: "Failed",
+      icon: <TriangleAlert size={iconSize} />,
+    },
   };
 
   return (
     <button
       onClick={handleClick}
       disabled={status === "sending"}
-      className="flex items-center gap-2 rounded-md border border-surface-border bg-surface-card px-4 py-2 text-sm font-medium text-surface-text transition hover:border-surface-accent hover:text-surface-accent disabled:cursor-not-allowed disabled:opacity-50"
+      className={`flex items-center rounded-md border border-surface-border bg-surface-card font-medium text-surface-text transition hover:border-surface-accent hover:text-surface-accent disabled:cursor-not-allowed disabled:opacity-50 ${
+        compact ? "gap-1.5 px-2.5 py-1.5 text-xs" : "gap-2 px-4 py-2 text-sm"
+      }`}
     >
       {content[status].icon}
-      {content[status].label}
+      {compact ? content[status].compactLabel : content[status].label}
     </button>
   );
 }

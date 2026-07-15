@@ -1,7 +1,7 @@
 "use client";
 
-import { useMemo } from "react";
-import { Circle, CircleMarker, MapContainer, TileLayer, Tooltip, useMapEvents } from "react-leaflet";
+import { useEffect, useMemo } from "react";
+import { Circle, CircleMarker, MapContainer, TileLayer, Tooltip, useMap, useMapEvents } from "react-leaflet";
 import type { LatLngBoundsExpression } from "leaflet";
 import "leaflet/dist/leaflet.css";
 import type { CellWeight, WarningBroadcastPayload } from "@/lib/types";
@@ -9,17 +9,36 @@ import type { DynamicRupture } from "@/lib/useDynamicRupture";
 import type { Region } from "@/lib/uzbekistanRegions";
 import RuptureWaveOverlay from "./RuptureWaveOverlay";
 
-const UZBEKISTAN_CENTER: [number, number] = [41.3, 64.5];
 const DEFAULT_ZOOM = 6;
-const MIN_ZOOM = 5;
 
-// A generous Central Asia frame around Uzbekistan — loose enough to pan
-// around comfortably, tight enough that the map can never be zoomed/panned
-// out to the repeated, wrapped whole-world view.
-const MAX_BOUNDS: LatLngBoundsExpression = [
-  [30, 48],
-  [50, 82],
+// The real limit: the whole Earth, not a Central Asia cage — this is a live
+// operational tool, and an operator may legitimately need to pan away to
+// check anything worldwide. maxBounds is still set to the world's own
+// bounds (not omitted) purely so panning can't wrap into the repeated,
+// duplicated-tile view past +/-180 longitude.
+const WORLD_BOUNDS: LatLngBoundsExpression = [
+  [-90, -180],
+  [90, 180],
 ];
+
+// Uzbekistan's real bounding box, used only to frame the initial view on
+// load — after that, the operator's own pan/zoom is left alone (no
+// re-fitting on resize the way the landing page's decorative map does,
+// since this map is an interactive tool, not an illustration).
+const UZBEKISTAN_BOUNDS: LatLngBoundsExpression = [
+  [37.0, 55.9],
+  [45.6, 73.2],
+];
+
+/** Frames the whole of Uzbekistan once, right after the map mounts. */
+function FitUzbekistanOnMount() {
+  const map = useMap();
+  useEffect(() => {
+    map.fitBounds(UZBEKISTAN_BOUNDS, { padding: [16, 16] });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [map]);
+  return null;
+}
 
 const S_WAVE_KM_PER_SEC = 3.5;
 const SENSOR_BURST_COUNT = 40;
@@ -99,13 +118,14 @@ export default function CommandMap({
 
   return (
     <MapContainer
-      center={UZBEKISTAN_CENTER}
+      center={[41.3, 64.5]}
       zoom={DEFAULT_ZOOM}
-      minZoom={MIN_ZOOM}
-      maxBounds={MAX_BOUNDS}
+      minZoom={2}
+      maxBounds={WORLD_BOUNDS}
       maxBoundsViscosity={1.0}
       scrollWheelZoom
       doubleClickZoom={false}
+      preferCanvas
       className="h-full w-full"
       style={{ background: "#020617" }}
     >
@@ -114,6 +134,7 @@ export default function CommandMap({
         url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
       />
 
+      <FitUzbekistanOnMount />
       <DoubleClickTrigger onDoubleClick={onMapDoubleClick} />
 
       {cells.map((cell) => (

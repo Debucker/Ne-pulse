@@ -137,6 +137,25 @@ export default function DashboardPage() {
     </button>
   );
 
+  // Smaller sibling of stressTestToggle for the mobile action row, where it
+  // sits alongside the compact TriggerButton in one line.
+  const stressTestToggleCompact = (
+    <button
+      type="button"
+      onClick={() => setStressTest((v) => !v)}
+      title="Inject 300+ synthetic nodes into the map to verify rendering performance at scale"
+      aria-pressed={stressTest}
+      className={`flex items-center gap-1 rounded-md border px-2 py-1.5 text-[11px] font-medium uppercase tracking-wide transition-colors ${
+        stressTest
+          ? "border-amber-500/60 bg-amber-500/10 text-amber-400"
+          : "border-surface-border text-surface-muted hover:text-surface-text"
+      }`}
+    >
+      <Zap size={12} />
+      {stressTest ? `Stress · ${STRESS_TEST_NODE_COUNT}` : "Stress Test"}
+    </button>
+  );
+
   // Shared between the mobile bottom sheet and the desktop sidebar — same
   // data, same markup, just mounted in whichever one of those two
   // containers is actually visible at the current breakpoint.
@@ -193,11 +212,21 @@ export default function DashboardPage() {
     <main className="relative h-full overflow-hidden lg:flex lg:h-auto lg:min-h-full lg:flex-col lg:gap-4 lg:overflow-visible lg:p-6">
       {showLoader && <EarthquakeLoader fullscreen={false} label="Connecting to live sensor network…" />}
 
-      {/* Header/status bar — floats above the full-screen map with its own
-          translucent backdrop below lg (z-30, above the map's z-0); reverts
-          to the original inline header (first in flow, above the map) at
-          lg+, matching the original desktop layout exactly. */}
-      <div className="relative z-30 flex flex-wrap items-center justify-between gap-2 border-b border-surface-border/70 bg-surface-bg/85 p-3 backdrop-blur-sm lg:static lg:gap-3 lg:border-0 lg:bg-transparent lg:p-0 lg:backdrop-blur-none">
+      {/* Header (mobile, <lg): title + live status share one line, region
+          dropdown sits below on its own — Trigger/Stress Test move to a
+          compact action row right above the bottom sheet instead (see
+          below), so this bar stays to just identity + connection +
+          location. */}
+      <div className="relative z-30 flex flex-col gap-2 border-b border-surface-border/70 bg-surface-bg/85 p-3 backdrop-blur-sm lg:hidden">
+        <div className="flex items-center justify-between gap-2">
+          <h1 className="text-lg font-semibold text-surface-text">Telemetry Tracking Workspace</h1>
+          {statusBadge}
+        </div>
+        <HomeLocationSelect value={homeLocation} onChange={handleHomeLocationChange} />
+      </div>
+
+      {/* Header (desktop, lg+): unchanged original single-row layout. */}
+      <div className="hidden lg:flex lg:flex-wrap lg:items-center lg:justify-between lg:gap-3">
         <div>
           <h1 className="text-lg font-semibold text-surface-text">Telemetry Tracking Workspace</h1>
           <p className="text-xs text-surface-muted">Live sensor mesh — cell density and rupture alerts</p>
@@ -237,44 +266,52 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* Bottom sheet: collapsed by default to a one-line status strip so
-          the map keeps almost the entire screen — it auto-expands the
-          instant a rupture actually needs attention (see the effect above),
-          and can be tapped open/closed manually any other time. Only the
-          strip (or, when expanded, the panel below it) intercepts touches;
-          the map above it is always fully reachable. Hidden at lg+, where
-          this content lives inline in the original boxed layout instead. */}
-      <div className="absolute inset-x-0 bottom-0 z-30 overflow-hidden rounded-t-2xl border-t border-surface-border/70 bg-surface-bg/90 backdrop-blur-sm lg:hidden">
-        <button
-          type="button"
-          onClick={() => setSheetExpanded((v) => !v)}
-          aria-expanded={sheetExpanded}
-          className="flex w-full items-center justify-between gap-2 px-4 py-3 text-left"
-        >
-          <span className="truncate text-xs font-medium text-surface-text">{sheetSummary}</span>
-          <ChevronUp
-            size={16}
-            className={`shrink-0 text-surface-muted transition-transform ${sheetExpanded ? "rotate-180" : ""}`}
-          />
-        </button>
+      {/* Bottom-anchored stack (mobile, <lg): a compact Trigger/Stress Test
+          action row, right above the bottom sheet — collapsed by default to
+          a one-line status strip so the map keeps almost the entire screen,
+          auto-expanding the instant a rupture actually needs attention (see
+          the effect above), tappable open/closed manually any other time.
+          Only these two rows intercept touches; the map above them is
+          always fully reachable. Hidden at lg+, where this content lives
+          inline in the original boxed layout instead. */}
+      <div className="absolute inset-x-0 bottom-0 z-30 flex flex-col lg:hidden">
+        <div className="flex items-center justify-center gap-2 border-t border-surface-border/70 bg-surface-bg/85 px-3 py-2 backdrop-blur-sm">
+          <TriggerButton onTrigger={() => handleTrigger()} compact />
+          {stressTestToggleCompact}
+        </div>
 
-        {sheetExpanded && (
-          <div className="max-h-[42vh] overflow-y-auto px-4 pb-4">
-            <div className="flex flex-col gap-3">{regionCountdownList}</div>
-            <div className="mt-3">
-              <SurvivalChecklist
-                remaining={dynamicRupture.remaining}
-                severity={dynamicRupture.severity}
-                distanceKm={dynamicRupture.distanceKm}
-                mmi={dynamicRupture.mmi}
-                ruptureKey={dynamicRupture.rupture?.triggeredAt ?? null}
-              />
+        <div className="overflow-hidden rounded-t-2xl border-t border-surface-border/70 bg-surface-bg/90 backdrop-blur-sm">
+          <button
+            type="button"
+            onClick={() => setSheetExpanded((v) => !v)}
+            aria-expanded={sheetExpanded}
+            className="flex w-full items-center justify-between gap-2 px-4 py-3 text-left"
+          >
+            <span className="truncate text-xs font-medium text-surface-text">{sheetSummary}</span>
+            <ChevronUp
+              size={16}
+              className={`shrink-0 text-surface-muted transition-transform ${sheetExpanded ? "rotate-180" : ""}`}
+            />
+          </button>
+
+          {sheetExpanded && (
+            <div className="max-h-[42vh] overflow-y-auto px-4 pb-4">
+              <div className="flex flex-col gap-3">{regionCountdownList}</div>
+              <div className="mt-3">
+                <SurvivalChecklist
+                  remaining={dynamicRupture.remaining}
+                  severity={dynamicRupture.severity}
+                  distanceKm={dynamicRupture.distanceKm}
+                  mmi={dynamicRupture.mmi}
+                  ruptureKey={dynamicRupture.rupture?.triggeredAt ?? null}
+                />
+              </div>
+              <div className="mt-3 flex items-center justify-between border-t border-surface-border pt-3 text-xs text-surface-muted">
+                {footerRow}
+              </div>
             </div>
-            <div className="mt-3 flex items-center justify-between border-t border-surface-border pt-3 text-xs text-surface-muted">
-              {footerRow}
-            </div>
-          </div>
-        )}
+          )}
+        </div>
       </div>
 
       {/* Desktop-only survival checklist + footer, in normal document flow

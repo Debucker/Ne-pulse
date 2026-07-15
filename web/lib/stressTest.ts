@@ -23,6 +23,10 @@ export function generateStressTestCells(count: number = STRESS_TEST_NODE_COUNT):
     cellId: `stress-${i}`,
     lat: randomInRange(LAT_RANGE),
     lng: randomInRange(LNG_RANGE),
-    weight: 1 + Math.random() * 24,
+    // A real CellWeight.weight is a device count — always a whole number.
+    // Leaving this as a raw float leaked garbage digits (e.g.
+    // "21.124234256135325 active readings") straight into the map's
+    // tooltips.
+    weight: Math.round(1 + Math.random() * 24),
   }));
 }
