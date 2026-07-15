@@ -104,7 +104,8 @@ export default function DashboardPage() {
     [clearAlert, dynamicRupture],
   );
 
-  const cells = stressTest ? [...(snapshot?.cells ?? []), ...stressCells] : (snapshot?.cells ?? []);
+  const realCells = snapshot?.cells ?? [];
+  const cells = stressTest ? [...realCells, ...stressCells] : realCells;
   const activeAlert = latestAlert?.payload ?? null;
   const sortedRegionWarnings = [...dynamicRupture.regionWarnings].sort((a, b) => a.remaining - b.remaining);
 
@@ -163,10 +164,18 @@ export default function DashboardPage() {
     </>
   );
 
+  // Deliberately reports the REAL cell count, not `cells.length` (which
+  // includes synthetic Stress Test nodes) — an earthquake early-warning
+  // dashboard must never let a load-testing toggle read as genuine device
+  // activity. The synthetic count is called out separately, in the same
+  // amber the Stress Test button itself uses, so it's unmistakable.
   const footerRow = (
     <>
       <span>
-        {cells.length} active cell{cells.length === 1 ? "" : "s"} tracked
+        {realCells.length} active cell{realCells.length === 1 ? "" : "s"} tracked
+        {stressTest && (
+          <span className="text-amber-400"> · +{stressCells.length} synthetic (stress test)</span>
+        )}
       </span>
       <span>ne-pulse telemetry engine</span>
     </>

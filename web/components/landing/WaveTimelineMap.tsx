@@ -2,18 +2,48 @@
 
 import { useEffect, useState } from "react";
 import { MapContainer, TileLayer, useMap } from "react-leaflet";
-import type { Map as LeafletMap } from "leaflet";
+import type { LatLngBoundsExpression, Map as LeafletMap } from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { AnimatePresence, motion } from "framer-motion";
 import { Monitor, Play } from "lucide-react";
 import RadarSweep from "./RadarSweep";
 
-// Same center/zoom the dashboard's own CommandMap uses, deliberately offset
-// from Tashkent itself (in the country's northeast) so the whole country
-// is framed, not just its capital corner.
+// Uzbekistan's real bounding box. A fixed center+zoom looked fine on a wide
+// desktop column but, at the same zoom level, a narrow mobile aspect-square
+// container shows a much tighter geographic window — cropping the whole
+// eastern side of the country (including Tashkent/Command Center) out of
+// frame. fitBounds (below) always frames this exact rectangle regardless of
+// the container's actual size or aspect ratio, so both breakpoints show the
+// whole country and Command Center is never clipped.
+const UZBEKISTAN_BOUNDS: LatLngBoundsExpression = [
+  [37.0, 55.9],
+  [45.6, 73.2],
+];
 const MAP_CENTER: [number, number] = [41.3, 64.5];
 const MAP_ZOOM = 6;
 const TASHKENT: [number, number] = [41.2995, 69.2401];
+
+/** Fits the map to Uzbekistan's bounding box on mount and whenever the
+    container itself resizes (rotation, window resize), so the whole
+    country stays framed no matter the container's aspect ratio. Leaflet
+    doesn't auto-detect container size changes on its own — a ResizeObserver
+    is what actually notices the CSS-driven aspect-square container
+    changing size and tells Leaflet to re-measure before refitting. */
+function FitUzbekistan() {
+  const map = useMap();
+  useEffect(() => {
+    function fit() {
+      map.invalidateSize();
+      map.fitBounds(UZBEKISTAN_BOUNDS, { padding: [12, 12] });
+    }
+    fit();
+
+    const observer = new ResizeObserver(fit);
+    observer.observe(map.getContainer());
+    return () => observer.disconnect();
+  }, [map]);
+  return null;
+}
 
 const COOLDOWN_SECONDS = 10;
 const RUPTURE_LAT_RANGE: [number, number] = [37.8, 44.5];
@@ -188,6 +218,7 @@ export default function WaveTimelineMap() {
         style={{ background: "#020617" }}
       >
         <TileLayer url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png" />
+        <FitUzbekistan />
         <MapOverlays />
       </MapContainer>
       <span className="pointer-events-none absolute bottom-1 right-2 z-[600] text-[9px] text-white/20">
