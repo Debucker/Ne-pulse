@@ -9,6 +9,7 @@ import { DEFAULT_HOME_REGION, UZBEKISTAN_REGIONS, type Region } from "@/lib/uzbe
 import { generateStressTestCells, STRESS_TEST_NODE_COUNT } from "@/lib/stressTest";
 import type { CellWeight } from "@/lib/types";
 import CountdownMeter from "@/components/dashboard/CountdownMeter";
+import DashboardNav from "@/components/dashboard/DashboardNav";
 import HomeLocationSelect from "@/components/dashboard/HomeLocationSelect";
 import SurvivalChecklist from "@/components/dashboard/SurvivalChecklist";
 import TriggerButton from "@/components/dashboard/TriggerButton";
@@ -209,8 +210,11 @@ export default function DashboardPage() {
     : "No active rupture — Safe Window";
 
   return (
-    <main className="relative h-full overflow-hidden lg:flex lg:h-auto lg:min-h-full lg:flex-col lg:gap-4 lg:overflow-visible lg:p-6">
-      {showLoader && <EarthquakeLoader fullscreen={false} label="Connecting to live sensor network…" />}
+    <>
+      <DashboardNav />
+      <div className="flex-1 overflow-y-auto">
+        <main className="relative h-full overflow-hidden lg:flex lg:h-auto lg:min-h-full lg:flex-col lg:gap-4 lg:overflow-visible lg:p-6">
+          {showLoader && <EarthquakeLoader fullscreen={false} label="Connecting to live sensor network…" />}
 
       {/* Header (mobile, <lg): title + live status share one line, region
           dropdown sits below on its own — Trigger/Stress Test move to a
@@ -328,6 +332,8 @@ export default function DashboardPage() {
       <footer className="hidden items-center justify-between border-t border-surface-border pt-3 text-xs text-surface-muted lg:flex">
         {footerRow}
       </footer>
-    </main>
+        </main>
+      </div>
+    </>
   );
 }

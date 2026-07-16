@@ -13,11 +13,11 @@
  * `window` at import time).
  */
 
-import Link from "next/link";
 import dynamic from "next/dynamic";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTelemetrySocket } from "@/lib/useTelemetrySocket";
 import { HARDWARE_INGRESS_URL } from "@/lib/config";
+import DashboardNav from "@/components/dashboard/DashboardNav";
 import { computeCellId } from "./grid";
 import type { Region, Rupture } from "./types";
 
@@ -227,9 +227,9 @@ const LITE_STYLES = `
 
 export default function LiteDashboardPage() {
   const [isMobileNode, setIsMobileNode] = useState(false);
-  // Kept only for the header's Live/Disconnected indicator — Lite's map
-  // itself renders no other device's telemetry, so the snapshot payload
-  // isn't consumed here.
+  // Passed down to DesktopCommandCenter's own header, next to its title —
+  // Lite's map itself renders no other device's telemetry, so the snapshot
+  // payload isn't consumed here.
   const { connected } = useTelemetrySocket();
 
   // Client-only detection: reading window/navigator during the initial
@@ -245,30 +245,13 @@ export default function LiteDashboardPage() {
     <div className="flex h-full flex-col bg-[#020617] font-mono text-slate-100">
       <style>{LITE_STYLES}</style>
 
-      {/* Deliberately minimal: this used to also spell out "NE-PULSE LITE"
-          and the current mode as text, redundant with both the outer
-          DashboardNav logo above and DesktopCommandCenter/MobileSensorNode's
-          own heading below — tripling up the same information ate real
-          vertical space on mobile for nothing. Just the home link, live
-          status, and the mode switch remain. */}
-      <div className="flex items-center justify-between gap-2 border-b border-slate-800 bg-slate-950/80 px-3 py-2.5 sm:px-6 sm:py-3">
-        <Link
-          href="/"
-          aria-label="Return to main platform"
-          className="flex h-7 w-7 flex-none items-center justify-center rounded-md border border-cyan-500/40 bg-cyan-500/10 text-xs font-bold text-cyan-400 transition hover:border-cyan-400"
-        >
-          NP
-        </Link>
-
-        <div className="flex items-center gap-2">
-          <span
-            className={`flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide ${
-              connected ? "text-cyan-400" : "text-slate-500"
-            }`}
-          >
-            <span className={`h-1.5 w-1.5 rounded-full ${connected ? "bg-cyan-400" : "bg-slate-600"}`} />
-            {connected ? "Live" : "Disconnected"}
-          </span>
+      {/* The mode switch is the only Lite-specific control on the shared
+          NE-PULSE bar — everything else that used to live in a second
+          "NE-PULSE LITE / COMMAND CENTER" row was redundant with this logo
+          bar plus DesktopCommandCenter/MobileSensorNode's own heading
+          below, tripling up the same information for nothing. */}
+      <DashboardNav
+        right={
           <button
             type="button"
             onClick={() => setIsMobileNode((v) => !v)}
@@ -279,11 +262,11 @@ export default function LiteDashboardPage() {
               Switch to {isMobileNode ? "Command Center View" : "Active Sensor Node View"}
             </span>
           </button>
-        </div>
-      </div>
+        }
+      />
 
       <div className="flex-1 overflow-y-auto">
-        {isMobileNode ? <MobileSensorNode /> : <DesktopCommandCenter />}
+        {isMobileNode ? <MobileSensorNode /> : <DesktopCommandCenter connected={connected} />}
       </div>
     </div>
   );
@@ -293,7 +276,7 @@ export default function LiteDashboardPage() {
 // Desktop mode: Command Center
 // ---------------------------------------------------------------------------
 
-function DesktopCommandCenter() {
+function DesktopCommandCenter({ connected }: { connected: boolean }) {
   const [home, setHome] = useState<Region>(UZBEKISTAN_REGIONS[0]);
   const [rupture, setRupture] = useState<Rupture | null>(null);
   const [now, setNow] = useState(() => Date.now());
@@ -346,6 +329,17 @@ function DesktopCommandCenter() {
 
   const phase = resolvePhase(homeReading ? homeReading.remaining : null, homeReading ? homeReading.mmi : null);
 
+  const liveBadge = (
+    <span
+      className={`flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide ${
+        connected ? "text-cyan-400" : "text-slate-500"
+      }`}
+    >
+      <span className={`h-1.5 w-1.5 rounded-full ${connected ? "bg-cyan-400" : "bg-slate-600"}`} />
+      {connected ? "Live" : "Disconnected"}
+    </span>
+  );
+
   const sheetSummary = rupture
     ? homeReading
       ? `${Math.max(0, Math.round(homeReading.remaining))}s to impact · MMI ${homeReading.mmi.toFixed(1)}`
@@ -378,19 +372,26 @@ function DesktopCommandCenter() {
 
   return (
     <main className="relative h-full overflow-hidden lg:mx-auto lg:flex lg:h-auto lg:max-w-7xl lg:flex-col lg:gap-4 lg:overflow-visible lg:p-6">
-      {/* Header (mobile, <lg): title on its own line, region dropdown
-          below — Trigger Random Rupture moves to a compact row right above
-          the bottom sheet instead (see below). */}
+      {/* Header (mobile, <lg): title + live status share one line, region
+          dropdown sits below — Trigger Random Rupture moves to a compact
+          row right above the bottom sheet instead (see below). */}
       <div className="relative z-30 flex flex-col gap-2 border-b border-slate-800/70 bg-slate-950/85 p-3 backdrop-blur-sm lg:hidden">
-        <h1 className="text-lg font-semibold text-slate-100">Lite Command Center</h1>
+        <div className="flex items-center justify-between gap-2">
+          <h1 className="text-lg font-semibold text-slate-100">Lite Command Center</h1>
+          {liveBadge}
+        </div>
         <RegionSelect value={home} onChange={setHome} />
       </div>
 
-      {/* Header (desktop, lg+): unchanged original single-row layout. */}
+      {/* Header (desktop, lg+): unchanged original single-row layout, plus
+          the live badge next to the title. */}
       <div className="hidden lg:flex lg:flex-wrap lg:items-center lg:justify-between lg:gap-3">
-        <div>
-          <h1 className="text-lg font-semibold text-slate-100">Lite Command Center</h1>
-          <p className="text-xs text-slate-500">Standalone dynamic rupture simulation — zero backend dependency</p>
+        <div className="flex items-center gap-3">
+          <div>
+            <h1 className="text-lg font-semibold text-slate-100">Lite Command Center</h1>
+            <p className="text-xs text-slate-500">Standalone dynamic rupture simulation — zero backend dependency</p>
+          </div>
+          {liveBadge}
         </div>
         <div className="flex flex-wrap items-center gap-3">
           <RegionSelect value={home} onChange={setHome} />
@@ -496,17 +497,19 @@ function DesktopCommandCenter() {
 
 function RegionSelect({ value, onChange }: { value: Region; onChange: (r: Region) => void }) {
   return (
-    <label className="flex items-center gap-2 rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-200">
+    <label className="flex w-full items-center gap-2 rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-200 lg:w-auto">
       <PinIcon />
-      <span className="hidden text-xs uppercase tracking-wide text-slate-500 sm:inline">My Selected Location:</span>
-      <div className="relative">
+      <span className="hidden flex-none text-xs uppercase tracking-wide text-slate-500 sm:inline">
+        My Selected Location:
+      </span>
+      <div className="relative min-w-0 flex-1 lg:flex-none">
         <select
           value={value.name}
           onChange={(e) => {
             const region = UZBEKISTAN_REGIONS.find((r) => r.name === e.target.value);
             if (region) onChange(region);
           }}
-          className="appearance-none bg-transparent pr-5 text-sm font-medium text-slate-100 outline-none"
+          className="w-full appearance-none bg-transparent pr-5 text-sm font-medium text-slate-100 outline-none lg:w-auto"
         >
           {UZBEKISTAN_REGIONS.map((region) => (
             <option key={region.name} value={region.name} className="bg-slate-900 text-slate-100">
