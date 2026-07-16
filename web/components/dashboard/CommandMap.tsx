@@ -30,12 +30,25 @@ const UZBEKISTAN_BOUNDS: LatLngBoundsExpression = [
   [45.6, 73.2],
 ];
 
-/** Frames the whole of Uzbekistan once, right after the map mounts. */
+/**
+ * Frames the whole of Uzbekistan once, right after the map mounts.
+ * CommandMap lives inside a dynamically-sized flex/absolute container
+ * (the mobile full-bleed layer, the desktop grid) — on a real device the
+ * container can still be settling to its final size the instant this
+ * effect fires, and fitBounds against a stale (often 0-height) size
+ * computes a wildly zoomed-out fit (the whole world instead of just
+ * Uzbekistan). invalidateSize() forces Leaflet to re-measure the container
+ * right before fitting, and deferring to the next frame gives the layout a
+ * beat to settle first.
+ */
 function FitUzbekistanOnMount() {
   const map = useMap();
   useEffect(() => {
-    map.fitBounds(UZBEKISTAN_BOUNDS, { padding: [16, 16] });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    const raf = requestAnimationFrame(() => {
+      map.invalidateSize();
+      map.fitBounds(UZBEKISTAN_BOUNDS, { padding: [16, 16] });
+    });
+    return () => cancelAnimationFrame(raf);
   }, [map]);
   return null;
 }

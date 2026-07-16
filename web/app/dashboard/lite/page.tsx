@@ -245,26 +245,24 @@ export default function LiteDashboardPage() {
     <div className="flex h-full flex-col bg-[#020617] font-mono text-slate-100">
       <style>{LITE_STYLES}</style>
 
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 bg-slate-950/80 px-3 py-2.5 sm:gap-3 sm:px-6 sm:py-3">
-        <div className="flex items-center gap-2 sm:gap-3">
-          <Link
-            href="/"
-            aria-label="Return to main platform"
-            className="flex h-7 w-7 flex-none items-center justify-center rounded-md border border-cyan-500/40 bg-cyan-500/10 text-xs font-bold text-cyan-400 transition hover:border-cyan-400"
-          >
-            NP
-          </Link>
-          <div>
-            <div className="text-sm font-semibold text-slate-100">NE-PULSE LITE</div>
-            <div className="text-[10px] uppercase tracking-wide text-slate-500">
-              {isMobileNode ? "Active Sensor Node" : "Command Center"}
-            </div>
-          </div>
-        </div>
+      {/* Deliberately minimal: this used to also spell out "NE-PULSE LITE"
+          and the current mode as text, redundant with both the outer
+          DashboardNav logo above and DesktopCommandCenter/MobileSensorNode's
+          own heading below — tripling up the same information ate real
+          vertical space on mobile for nothing. Just the home link, live
+          status, and the mode switch remain. */}
+      <div className="flex items-center justify-between gap-2 border-b border-slate-800 bg-slate-950/80 px-3 py-2.5 sm:px-6 sm:py-3">
+        <Link
+          href="/"
+          aria-label="Return to main platform"
+          className="flex h-7 w-7 flex-none items-center justify-center rounded-md border border-cyan-500/40 bg-cyan-500/10 text-xs font-bold text-cyan-400 transition hover:border-cyan-400"
+        >
+          NP
+        </Link>
 
         <div className="flex items-center gap-2">
           <span
-            className={`hidden items-center gap-1.5 text-xs font-medium uppercase tracking-wide sm:flex ${
+            className={`flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide ${
               connected ? "text-cyan-400" : "text-slate-500"
             }`}
           >
@@ -380,10 +378,16 @@ function DesktopCommandCenter() {
 
   return (
     <main className="relative h-full overflow-hidden lg:mx-auto lg:flex lg:h-auto lg:max-w-7xl lg:flex-col lg:gap-4 lg:overflow-visible lg:p-6">
-      {/* Header/status bar — floats above the full-screen map with its own
-          translucent backdrop below lg; reverts to the original inline
-          header (first in flow, above the map) at lg+. */}
-      <div className="relative z-30 flex flex-wrap items-center justify-between gap-2 border-b border-slate-800/70 bg-slate-950/85 p-3 backdrop-blur-sm lg:static lg:gap-3 lg:border-0 lg:bg-transparent lg:p-0 lg:backdrop-blur-none">
+      {/* Header (mobile, <lg): title on its own line, region dropdown
+          below — Trigger Random Rupture moves to a compact row right above
+          the bottom sheet instead (see below). */}
+      <div className="relative z-30 flex flex-col gap-2 border-b border-slate-800/70 bg-slate-950/85 p-3 backdrop-blur-sm lg:hidden">
+        <h1 className="text-lg font-semibold text-slate-100">Lite Command Center</h1>
+        <RegionSelect value={home} onChange={setHome} />
+      </div>
+
+      {/* Header (desktop, lg+): unchanged original single-row layout. */}
+      <div className="hidden lg:flex lg:flex-wrap lg:items-center lg:justify-between lg:gap-3">
         <div>
           <h1 className="text-lg font-semibold text-slate-100">Lite Command Center</h1>
           <p className="text-xs text-slate-500">Standalone dynamic rupture simulation — zero backend dependency</p>
@@ -427,33 +431,48 @@ function DesktopCommandCenter() {
       {/* Bottom sheet: collapsed by default to a one-line status strip so
           the map keeps almost the entire screen — it auto-expands the
           instant a rupture actually needs attention, and can be tapped
-          open/closed manually any other time. Hidden at lg+, where this
+          open/closed manually any other time. A compact Trigger Random
+          Rupture row floats right above it. Hidden at lg+, where this
           content lives inline in the original boxed layout instead. */}
-      <div className="absolute inset-x-0 bottom-0 z-30 overflow-hidden rounded-t-2xl border-t border-slate-800/70 bg-slate-950/90 backdrop-blur-sm lg:hidden">
-        <button
-          type="button"
-          onClick={() => setSheetExpanded((v) => !v)}
-          aria-expanded={sheetExpanded}
-          className="flex w-full items-center justify-between gap-2 px-4 py-3 text-left"
-        >
-          <span className="truncate text-xs font-medium text-slate-100">{sheetSummary}</span>
-          <ChevronIcon className={`shrink-0 text-slate-500 transition-transform ${sheetExpanded ? "" : "rotate-180"}`} />
-        </button>
+      <div className="absolute inset-x-0 bottom-0 z-30 flex flex-col lg:hidden">
+        <div className="flex items-center justify-center border-t border-slate-800/70 bg-slate-950/85 px-3 py-2 backdrop-blur-sm">
+          <button
+            type="button"
+            onClick={() => triggerRupture()}
+            className="flex items-center gap-1.5 rounded-md border border-cyan-500/50 bg-cyan-500/10 px-2.5 py-1.5 text-xs font-medium text-cyan-300 transition hover:bg-cyan-500/20"
+          >
+            <BoltIcon /> Trigger Rupture
+          </button>
+        </div>
 
-        {sheetExpanded && (
-          <div className="max-h-[42vh] overflow-y-auto px-4 pb-4">
-            <div className="flex flex-col gap-3">{regionCountdownList}</div>
-            <div className="mt-3">
-              <SurvivalChecklistPanel
-                phase={phase}
-                remaining={homeReading ? homeReading.remaining : null}
-                distanceKm={homeReading ? homeReading.distanceKm : null}
-                mmi={homeReading ? homeReading.mmi : null}
-                ruptureKey={rupture?.triggeredAt ?? null}
-              />
+        <div className="overflow-hidden rounded-t-2xl border-t border-slate-800/70 bg-slate-950/90 backdrop-blur-sm">
+          <button
+            type="button"
+            onClick={() => setSheetExpanded((v) => !v)}
+            aria-expanded={sheetExpanded}
+            className="flex w-full items-center justify-between gap-2 px-4 py-3 text-left"
+          >
+            <span className="truncate text-xs font-medium text-slate-100">{sheetSummary}</span>
+            <ChevronIcon
+              className={`shrink-0 text-slate-500 transition-transform ${sheetExpanded ? "" : "rotate-180"}`}
+            />
+          </button>
+
+          {sheetExpanded && (
+            <div className="max-h-[42vh] overflow-y-auto px-4 pb-4">
+              <div className="flex flex-col gap-3">{regionCountdownList}</div>
+              <div className="mt-3">
+                <SurvivalChecklistPanel
+                  phase={phase}
+                  remaining={homeReading ? homeReading.remaining : null}
+                  distanceKm={homeReading ? homeReading.distanceKm : null}
+                  mmi={homeReading ? homeReading.mmi : null}
+                  ruptureKey={rupture?.triggeredAt ?? null}
+                />
+              </div>
             </div>
-          </div>
-        )}
+          )}
+        </div>
       </div>
 
       {/* Desktop-only survival checklist, in normal document flow below
