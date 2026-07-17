@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import type { ReactNode } from "react";
 import { Inter } from "next/font/google";
 import SiteLoadGate from "@/components/SiteLoadGate";
+import ServiceWorkerRegister from "@/components/ServiceWorkerRegister";
 import "./globals.css";
 
 const inter = Inter({
@@ -65,6 +66,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en" className={inter.variable}>
       <body className="bg-surface-bg font-sans text-surface-text antialiased">
+        <ServiceWorkerRegister />
         <SiteLoadGate>{children}</SiteLoadGate>
       </body>
     </html>

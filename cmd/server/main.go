@@ -167,6 +167,7 @@ func main() {
 	mux.HandleFunc("/ws/control", controlHub.ServeWS)
 	mux.HandleFunc("/api/simulate-rupture", control.SimulateRuptureHandler(controlHub, radar))
 	mux.HandleFunc("/api/ingress/hardware", ingress.NewHardwareHandler(pool))
+	mux.HandleFunc("/api/v1/alert", alertHandler(controlHub))
 	mux.HandleFunc("/api/health", healthHandler(pool, store, radar, telemetryHub, controlHub))
 	httpServer := &http.Server{Addr: *httpAddr, Handler: withCORS(originAllowed, limiter.Middleware(mux))}
 
@@ -288,6 +289,75 @@ func withCORS(originAllowed func(r *http.Request) bool, next http.Handler) http.
 		}
 		next.ServeHTTP(w, r)
 	})
+}
+
+// alertPayload is broadcast to every connected /ws/control client (the same
+// hub the "Trigger Rupture" demo already uses) on POST /api/v1/alert.
+// Distinct Type from control.RuptureCommand's "simulate-rupture" so a
+// client can tell the two apart if it ever needs to.
+type alertPayload struct {
+	Type      string    `json:"type"`
+	Lat       float64   `json:"lat"`
+	Lng       float64   `json:"lng"`
+	Magnitude float64   `json:"magnitude"`
+	Timestamp time.Time `json:"timestamp"`
+}
+
+type alertRequest struct {
+	Lat       float64 `json:"lat"`
+	Lng       float64 `json:"lng"`
+	Magnitude float64 `json:"magnitude"`
+}
+
+// alertHandler returns an http.HandlerFunc for POST /api/v1/alert: an
+// external caller (a future push-notification relay, a manual test,
+// another sensor gateway) supplies a lat/lng/magnitude, which is broadcast
+// as-is to every connected control-hub client — the same websocket
+// (/ws/control) control.SimulateRuptureHandler already publishes to, so any
+// existing listener needs no changes to also receive these.
+//
+// Same validation and unauthenticated exposure as
+// control.SimulateRuptureHandler — this route has no auth of its own
+// (matching the rest of the demo API), so anyone who can reach it can
+// broadcast an alert. Fine for internal testing; lock it down before using
+// it for anything a real user would see.
+func alertHandler(controlHub *hub.Hub) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		defer r.Body.Close()
+
+		var req alertRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			http.Error(w, "invalid request body: "+err.Error(), http.StatusBadRequest)
+			return
+		}
+		if req.Lat < -90 || req.Lat > 90 || req.Lng < -180 || req.Lng > 180 {
+			http.Error(w, "lat/lng out of range", http.StatusBadRequest)
+			return
+		}
+		if req.Magnitude < 0 || req.Magnitude > 10 {
+			http.Error(w, "magnitude out of range", http.StatusBadRequest)
+			return
+		}
+
+		payload := alertPayload{Type: "alert", Lat: req.Lat, Lng: req.Lng, Magnitude: req.Magnitude, Timestamp: time.Now()}
+		body, err := json.Marshal(payload)
+		if err != nil {
+			http.Error(w, "internal error", http.StatusInternalServerError)
+			return
+		}
+
+		delivered := controlHub.Broadcast(body)
+		log.Printf("alert: v1 alert broadcast lat=%.4f lng=%.4f mag=%.1f delivered=%v control-clients=%d",
+			req.Lat, req.Lng, req.Magnitude, delivered, controlHub.ClientCount())
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusAccepted)
+		_ = json.NewEncoder(w).Encode(payload)
+	}
 }
 
 func healthHandler(pool *ingest.WorkerPool, store *storage.Store, radar *detector.SpatialRadar, telemetryHub, controlHub *hub.Hub) http.HandlerFunc {

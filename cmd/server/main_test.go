@@ -1,9 +1,14 @@
 package main
 
 import (
+	"bytes"
+	"context"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
+
+	"ne-pulse/internal/hub"
 )
 
 func TestNewOriginChecker_AllowsConfiguredOrigins(t *testing.T) {
@@ -122,5 +127,62 @@ func TestWithCORS_HandlesOptionsPreflightWithNoContent(t *testing.T) {
 	}
 	if called {
 		t.Error("the wrapped handler should not run for an OPTIONS preflight")
+	}
+}
+
+func TestAlertHandler_BroadcastsValidPayloadToControlHub(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	h := hub.New(ctx, nil)
+	go h.Run()
+
+	body, _ := json.Marshal(alertRequest{Lat: 41.3, Lng: 69.24, Magnitude: 6.5})
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/alert", bytes.NewReader(body))
+	rec := httptest.NewRecorder()
+
+	alertHandler(h)(rec, req)
+
+	if rec.Code != http.StatusAccepted {
+		t.Fatalf("status = %d, want %d; body=%s", rec.Code, http.StatusAccepted, rec.Body.String())
+	}
+	var resp alertPayload
+	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+	if resp.Type != "alert" || resp.Lat != 41.3 || resp.Lng != 69.24 || resp.Magnitude != 6.5 {
+		t.Errorf("response payload = %+v, fields don't match the request", resp)
+	}
+}
+
+func TestAlertHandler_RejectsOutOfRangeCoordinates(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	h := hub.New(ctx, nil)
+	go h.Run()
+
+	body, _ := json.Marshal(alertRequest{Lat: 999, Lng: 69.24, Magnitude: 6.5})
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/alert", bytes.NewReader(body))
+	rec := httptest.NewRecorder()
+
+	alertHandler(h)(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Errorf("status = %d, want %d for out-of-range latitude", rec.Code, http.StatusBadRequest)
+	}
+}
+
+func TestAlertHandler_RejectsNonPostMethod(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	h := hub.New(ctx, nil)
+	go h.Run()
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/alert", nil)
+	rec := httptest.NewRecorder()
+
+	alertHandler(h)(rec, req)
+
+	if rec.Code != http.StatusMethodNotAllowed {
+		t.Errorf("status = %d, want %d", rec.Code, http.StatusMethodNotAllowed)
 	}
 }

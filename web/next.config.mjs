@@ -29,13 +29,22 @@ const nextConfig = {
           { key: "X-Content-Type-Options", value: "nosniff" },
           { key: "X-Frame-Options", value: "SAMEORIGIN" },
           { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
-          // geolocation=(self): the Lite dashboard's Mobile Sensor Node mode
-          // calls navigator.geolocation from this origin's own pages (no
-          // third-party embed needs it, so it isn't opened up further).
-          // Blocking it outright would silently degrade every real device
-          // to its mocked-coordinate fallback in production.
-          { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=(self)" },
+          // Nothing in the app calls navigator.geolocation anymore (the old
+          // Lite Mobile Sensor Node mode that did was replaced by the
+          // offline local-alarm rewrite, which only reads the
+          // accelerometer) — locked back down to fully blocked.
+          { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()" },
         ],
+      },
+      {
+        // A service worker file must always be revalidated by the browser
+        // (that's how it detects a new version exists at all) — any cache
+        // here, CDN-level or browser-level, means a device can get stuck
+        // running a stale/broken service worker for as long as that cache
+        // lives. For an offline emergency-alarm tool, that's the one file
+        // that must never go stale silently.
+        source: "/sw.js",
+        headers: [{ key: "Cache-Control", value: "public, max-age=0, must-revalidate" }],
       },
     ];
   },
