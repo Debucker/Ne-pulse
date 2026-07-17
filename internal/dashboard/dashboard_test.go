@@ -125,6 +125,55 @@ func TestDashboardConsumer_AggregatesFrameCountsPerCellAndPublishesSnapshot(t *t
 	}
 }
 
+// TestDashboardConsumer_TracksPeakMagnitudePerCell proves MaxMagnitude
+// reflects the strongest reading seen in a cell during the window — not the
+// last one processed or a sum/average — since a single weak frame arriving
+// after a strong one must not mask the strong one from the live map.
+func TestDashboardConsumer_TracksPeakMagnitudePerCell(t *testing.T) {
+	fake := &fakeBroadcaster{}
+	agg := NewAggregator(fake, bandIndexer{}, 20*time.Millisecond)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go agg.Run(ctx)
+
+	consumer := newDashboardConsumer(agg, bandIndexer{})
+
+	// Cell 1: weak, then strong, then weak again — peak must still be the
+	// strong middle reading (3-4-0 vector norm = 5).
+	consumer.Consume(ctx, &ingest.TelemetryFrame{Latitude: 40.1, Longitude: 69.0, AccX: 0.1})
+	consumer.Consume(ctx, &ingest.TelemetryFrame{Latitude: 40.1, Longitude: 69.0, AccX: 3, AccY: 4})
+	consumer.Consume(ctx, &ingest.TelemetryFrame{Latitude: 40.1, Longitude: 69.0, AccX: 0.2})
+	// Cell 2: single, smaller reading (norm = 1) — must stay independent of
+	// cell 1's peak.
+	consumer.Consume(ctx, &ingest.TelemetryFrame{Latitude: 42.1, Longitude: 69.0, AccZ: 1})
+	consumer.Flush(ctx)
+
+	deadline := time.Now().Add(500 * time.Millisecond)
+	for fake.count() == 0 && time.Now().Before(deadline) {
+		time.Sleep(5 * time.Millisecond)
+	}
+	if fake.count() == 0 {
+		t.Fatal("aggregator never published a snapshot")
+	}
+
+	var snapshot TelemetrySnapshot
+	if err := json.Unmarshal(fake.last(), &snapshot); err != nil {
+		t.Fatalf("failed to unmarshal published snapshot: %v", err)
+	}
+
+	peaks := make(map[string]float64)
+	for _, c := range snapshot.Cells {
+		peaks[c.CellID] = c.MaxMagnitude
+	}
+	idHex := func(id uint64) string { return strconv.FormatUint(id, 16) }
+	if got := peaks[idHex(1)]; got != 5 {
+		t.Errorf("cell 1 MaxMagnitude = %v, want 5", got)
+	}
+	if got := peaks[idHex(2)]; got != 1 {
+		t.Errorf("cell 2 MaxMagnitude = %v, want 1", got)
+	}
+}
+
 // TestAggregator_RetainsLatestSnapshotForLateJoiningClients proves every
 // published snapshot is also retained (not just broadcast), so a client
 // that connects well after this tick — e.g. after whatever was generating

@@ -1,8 +1,8 @@
 // Package ingress is ne-pulse's real-world hardware/public-data boundary: it
 // translates raw JSON payloads from physical edge devices (an ESP32 +
-// MPU6050 accelerometer, or a mobile browser's native DeviceMotionEvent)
-// into ne-pulse's internal ingest.TelemetryFrame, and exposes an HTTP endpoint
-// so those devices can reach the worker pool without ever needing to speak
+// MPU6050 accelerometer, or any other third-party hardware rig) into
+// ne-pulse's internal ingest.TelemetryFrame, and exposes an HTTP endpoint so
+// those devices can reach the worker pool without ever needing to speak
 // gRPC or link the generated protobuf client.
 package ingress
 
@@ -13,6 +13,7 @@ import (
 	"log"
 	"math"
 	"net/http"
+	"strings"
 	"time"
 
 	"ne-pulse/internal/ingest"
@@ -34,33 +35,31 @@ const (
 	maxAccelerationMS2         = maxAccelerationG * metersPerSecondSquaredPerG
 )
 
-// HardwareFrame is the raw JSON payload shape a physical edge device or a
-// browser client is expected to POST. Field names cover the two most
-// common real-world sources so either can be decoded without a translation
-// layer on the device side: firmware talking directly to an MPU6050 sends
-// flat accX/accY/accZ fields, while a browser forwarding a
-// DeviceMotionEvent naturally has a nested {x,y,z} acceleration object.
-type HardwareFrame struct {
+// HardwareTelemetryPayload is the JSON wire format for Phase 2's
+// third-party hardware ingress: a real ESP32+MPU6050 rig (or any other
+// external device) POSTs one of these per accelerometer sample.
+//
+// DeviceID is required, not decorative: internal/detector's spatial radar
+// only confirms a rupture once enough *unique* devices report shaking in
+// the same H3 cell within a short trailing window (SpatialRadar.Ingest
+// builds a per-cell set keyed on DeviceID — see radar.go). Every reading
+// needs a stable identity so the radar can tell "10 different devices just
+// agreed" apart from "one device sent 10 readings." Omit this field (or
+// send the same placeholder for every device) and every reading collides
+// on the same key, so the coincidence detector can never legitimately fire
+// from real distinct hardware.
+type HardwareTelemetryPayload struct {
 	DeviceID  string  `json:"deviceId"`
 	Latitude  float64 `json:"lat"`
 	Longitude float64 `json:"lng"`
-
-	AccX float64 `json:"accX"`
-	AccY float64 `json:"accY"`
-	AccZ float64 `json:"accZ"`
-
-	// Acceleration mirrors DeviceMotionEvent.acceleration's {x,y,z} shape.
-	// When present, it takes precedence over the flat AccX/Y/Z fields.
-	Acceleration *struct {
-		X float64 `json:"x"`
-		Y float64 `json:"y"`
-		Z float64 `json:"z"`
-	} `json:"acceleration,omitempty"`
-
-	// TimestampMs is optional — a browser or minimal firmware client may
-	// not have a synchronized clock worth trusting; when omitted (zero),
-	// ToTelemetryFrame stamps the server's own receipt time instead.
-	TimestampMs int64 `json:"timestampMs"`
+	AccelX    float64 `json:"ax"`
+	AccelY    float64 `json:"ay"`
+	AccelZ    float64 `json:"az"`
+	// Unix millisecond timestamp. Optional — a device without a
+	// synchronized clock worth trusting can omit this (send 0, or the
+	// field entirely), and ToTelemetryFrame stamps the server's own
+	// receipt time instead.
+	Timestamp int64 `json:"ts"`
 }
 
 // ErrMissingDeviceID, ErrMissingCoordinates, and ErrAccelerationOutOfRange
@@ -79,51 +78,110 @@ func validAcceleration(v float64) bool {
 	return !math.IsNaN(v) && !math.IsInf(v, 0) && v >= -maxAccelerationMS2 && v <= maxAccelerationMS2
 }
 
-// ToTelemetryFrame translates a raw hardware/browser payload into ne-pulse's
+// ToTelemetryFrame translates a raw hardware payload into ne-pulse's
 // internal frame representation, acquiring a pooled frame the same way the
 // gRPC hot path does (ingest.AcquireFrame) rather than allocating a
 // throwaway struct — this adapter is meant to sit directly in front of
 // ingest.WorkerPool.Submit. The caller owns the returned frame's lifecycle
 // exactly as the gRPC server does: submit it to the pool, which releases it
 // back to the pool internally once consumed.
-func (h HardwareFrame) ToTelemetryFrame() (*ingest.TelemetryFrame, error) {
-	if h.DeviceID == "" {
+func (p HardwareTelemetryPayload) ToTelemetryFrame() (*ingest.TelemetryFrame, error) {
+	if p.DeviceID == "" {
 		return nil, ErrMissingDeviceID
 	}
-	if h.Latitude == 0 && h.Longitude == 0 {
+	if p.Latitude == 0 && p.Longitude == 0 {
 		return nil, ErrMissingCoordinates
 	}
-
-	accX, accY, accZ := h.AccX, h.AccY, h.AccZ
-	if h.Acceleration != nil {
-		accX, accY, accZ = h.Acceleration.X, h.Acceleration.Y, h.Acceleration.Z
-	}
-	if !validAcceleration(accX) || !validAcceleration(accY) || !validAcceleration(accZ) {
+	if !validAcceleration(p.AccelX) || !validAcceleration(p.AccelY) || !validAcceleration(p.AccelZ) {
 		return nil, ErrAccelerationOutOfRange
 	}
 
 	frame := ingest.AcquireFrame()
-	frame.DeviceID = h.DeviceID
-	frame.Latitude = h.Latitude
-	frame.Longitude = h.Longitude
-	frame.AccX = float32(accX)
-	frame.AccY = float32(accY)
-	frame.AccZ = float32(accZ)
+	frame.DeviceID = p.DeviceID
+	frame.Latitude = p.Latitude
+	frame.Longitude = p.Longitude
+	frame.AccX = float32(p.AccelX)
+	frame.AccY = float32(p.AccelY)
+	frame.AccZ = float32(p.AccelZ)
 
-	frame.TimestampMs = h.TimestampMs
+	frame.TimestampMs = p.Timestamp
 	if frame.TimestampMs == 0 {
 		frame.TimestampMs = time.Now().UnixMilli()
 	}
 	return frame, nil
 }
 
-// DecodeHardwareFrame parses a single raw JSON payload.
-func DecodeHardwareFrame(data []byte) (HardwareFrame, error) {
-	var h HardwareFrame
-	if err := json.Unmarshal(data, &h); err != nil {
-		return HardwareFrame{}, err
+// DecodeHardwareTelemetryPayload parses a single raw JSON payload.
+func DecodeHardwareTelemetryPayload(data []byte) (HardwareTelemetryPayload, error) {
+	var p HardwareTelemetryPayload
+	if err := json.Unmarshal(data, &p); err != nil {
+		return HardwareTelemetryPayload{}, err
 	}
-	return h, nil
+	return p, nil
+}
+
+// TokenAuthenticator checks a hardware device's X-API-Token header against
+// a fixed set of provisioned tokens (see cmd/server/main.go's
+// -api-tokens flag/NE_PULSE_API_TOKENS env var). Deliberately simple —
+// resource-constrained IoT firmware can authenticate with one static
+// header, no OAuth flow, no per-device credential rotation.
+//
+// If no tokens are configured at all (the out-of-the-box local-dev
+// default), every request is let through unchecked — configuring at least
+// one real token is what switches this endpoint from fully open to
+// strictly enforced. This is a real, security-relevant default: deploying
+// to production without ever setting -api-tokens leaves hardware ingress
+// exactly as open as it was before this change.
+type TokenAuthenticator struct {
+	tokens map[string]struct{}
+}
+
+// NewTokenAuthenticator parses a comma-separated token list. An empty
+// string produces an authenticator with no tokens configured at all — see
+// the Configured/Middleware docs for what that means.
+func NewTokenAuthenticator(commaSeparated string) *TokenAuthenticator {
+	tokens := make(map[string]struct{})
+	for _, t := range strings.Split(commaSeparated, ",") {
+		t = strings.TrimSpace(t)
+		if t != "" {
+			tokens[t] = struct{}{}
+		}
+	}
+	return &TokenAuthenticator{tokens: tokens}
+}
+
+// Configured reports whether at least one real token has been provisioned.
+func (a *TokenAuthenticator) Configured() bool {
+	return len(a.tokens) > 0
+}
+
+// Allowed reports whether token is one of the provisioned tokens. An empty
+// token is never allowed, even if (pathologically) an empty string were
+// somehow present in the configured set.
+func (a *TokenAuthenticator) Allowed(token string) bool {
+	if token == "" {
+		return false
+	}
+	_, ok := a.tokens[token]
+	return ok
+}
+
+// Middleware rejects a request with 401 Unauthorized unless it carries a
+// valid X-API-Token header — but only once at least one token has actually
+// been configured (see Configured); otherwise every request passes through
+// unchecked, matching today's fully-open behavior until real tokens are
+// provisioned.
+func (a *TokenAuthenticator) Middleware(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if a.Configured() {
+			token := r.Header.Get("X-API-Token")
+			if !a.Allowed(token) {
+				http.Error(w, "invalid or missing X-API-Token", http.StatusUnauthorized)
+				return
+			}
+		}
+		next(w, r)
+	}
 }
 
 // hardwareIngestResponse is the JSON body returned to the device on
@@ -134,12 +192,17 @@ type hardwareIngestResponse struct {
 }
 
 // NewHardwareHandler returns an http.HandlerFunc that decodes a single
-// HardwareFrame JSON body per POST and submits it to pool, exactly
-// mirroring one iteration of the gRPC hot path (ingest.Server.StreamTelemetry)
-// but for clients that can only speak plain HTTP — real ESP32/MPU6050
-// firmware, or a browser DeviceMotionEvent listener. One request = one
-// frame, so it stays cheap enough for a microcontroller to call on every
-// sample without needing to maintain a persistent stream.
+// HardwareTelemetryPayload JSON body per POST and submits it to pool,
+// exactly mirroring one iteration of the gRPC hot path
+// (ingest.Server.StreamTelemetry) but for clients that can only speak
+// plain HTTP — real ESP32/MPU6050 firmware, or any other third-party
+// hardware rig. One request = one frame, so it stays cheap enough for a
+// microcontroller to call on every sample without needing to maintain a
+// persistent stream.
+//
+// This handler has no authentication of its own — wrap it in a
+// TokenAuthenticator's Middleware (see cmd/server/main.go) to require
+// X-API-Token.
 func NewHardwareHandler(pool *ingest.WorkerPool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
@@ -155,13 +218,13 @@ func NewHardwareHandler(pool *ingest.WorkerPool) http.HandlerFunc {
 			return
 		}
 
-		hw, err := DecodeHardwareFrame(body)
+		payload, err := DecodeHardwareTelemetryPayload(body)
 		if err != nil {
 			http.Error(w, "invalid payload: "+err.Error(), http.StatusBadRequest)
 			return
 		}
 
-		frame, err := hw.ToTelemetryFrame()
+		frame, err := payload.ToTelemetryFrame()
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
@@ -169,7 +232,7 @@ func NewHardwareHandler(pool *ingest.WorkerPool) http.HandlerFunc {
 
 		accepted := pool.Submit(frame)
 		if !accepted {
-			log.Printf("ingress: worker pool backlog full, dropped frame from device %s", hw.DeviceID)
+			log.Printf("ingress: worker pool backlog full, dropped frame from device %s", payload.DeviceID)
 		}
 
 		w.Header().Set("Content-Type", "application/json")

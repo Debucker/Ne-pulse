@@ -25,6 +25,7 @@ ExecStart={{REPO_ROOT}}/bin/ne-pulse-server \
   -radar-cooldown=${RADAR_COOLDOWN} \
   -rate-limit-per-second=${RATE_LIMIT_PER_SECOND} \
   -rate-limit-burst=${RATE_LIMIT_BURST} \
+  -api-tokens=${API_TOKENS} \
   -notify-webhook-url=${NOTIFY_WEBHOOK_URL} \
   -notify-safety-margin=${NOTIFY_SAFETY_MARGIN}
 

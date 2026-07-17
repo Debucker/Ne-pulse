@@ -18,10 +18,18 @@ import (
 // updates for thousands of devices would start costing frames.
 const DefaultFlushInterval = 150 * time.Millisecond
 
-// CellDelta is one worker's per-cell frame-count contribution for a single
-// flush interval, handed off wholesale to the Aggregator rather than
-// merged under a shared lock.
-type CellDelta map[uint64]int
+// CellStat is one cell's accumulated activity within a single flush
+// interval: how many readings landed in it, and the strongest acceleration
+// magnitude (m/s^2) seen among them.
+type CellStat struct {
+	Count        int
+	MaxMagnitude float64
+}
+
+// CellDelta is one worker's per-cell contribution for a single flush
+// interval, handed off wholesale to the Aggregator rather than merged
+// under a shared lock.
+type CellDelta map[uint64]CellStat
 
 // broadcaster is the seam Aggregator depends on instead of *hub.Hub
 // directly, so its aggregation logic is testable with a fake — no real
@@ -63,7 +71,7 @@ func NewAggregator(b broadcaster, indexer detector.CellIndexer, flushInterval ti
 // incoming deltas and publishing (then resetting) a snapshot every
 // flushInterval. Exits when ctx is canceled.
 func (a *Aggregator) Run(ctx context.Context) {
-	totals := make(map[uint64]int)
+	totals := make(map[uint64]CellStat)
 	ticker := time.NewTicker(a.flushInterval)
 	defer ticker.Stop()
 
@@ -72,28 +80,34 @@ func (a *Aggregator) Run(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case delta := <-a.deltas:
-			for cellID, count := range delta {
-				totals[cellID] += count
+			for cellID, stat := range delta {
+				total := totals[cellID]
+				total.Count += stat.Count
+				if stat.MaxMagnitude > total.MaxMagnitude {
+					total.MaxMagnitude = stat.MaxMagnitude
+				}
+				totals[cellID] = total
 			}
 		case <-ticker.C:
 			if len(totals) == 0 {
 				continue
 			}
 			a.publish(totals)
-			totals = make(map[uint64]int)
+			totals = make(map[uint64]CellStat)
 		}
 	}
 }
 
-func (a *Aggregator) publish(totals map[uint64]int) {
+func (a *Aggregator) publish(totals map[uint64]CellStat) {
 	cells := make([]CellWeight, 0, len(totals))
-	for cellID, weight := range totals {
+	for cellID, stat := range totals {
 		lat, lng := a.indexer.CellCenter(cellID)
 		cells = append(cells, CellWeight{
-			CellID: strconv.FormatUint(cellID, 16),
-			Lat:    lat,
-			Lng:    lng,
-			Weight: weight,
+			CellID:       strconv.FormatUint(cellID, 16),
+			Lat:          lat,
+			Lng:          lng,
+			Weight:       stat.Count,
+			MaxMagnitude: stat.MaxMagnitude,
 		})
 	}
 

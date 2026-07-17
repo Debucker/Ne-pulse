@@ -62,10 +62,15 @@ func main() {
 		"comma-separated list of origins allowed to reach the HTTP API and websocket endpoints (CORS + WebSocket handshake Origin check)")
 	rateLimitPerSecond := flag.Float64("rate-limit-per-second", 5, "max HTTP requests/second allowed per client IP, across the dashboard/control/ingress HTTP API")
 	rateLimitBurst := flag.Int("rate-limit-burst", 5, "short burst allowance per client IP on top of the steady-state rate")
+	apiTokens := flag.String("api-tokens", "", "comma-separated list of valid X-API-Token values for third-party hardware ingress (POST /api/ingress/hardware); empty leaves that endpoint open to any caller (the default, matching prior behavior) until real tokens are provisioned")
 	flag.Parse()
 
 	originAllowed := newOriginChecker(*corsAllowedOrigins)
 	limiter := ratelimit.New(*rateLimitPerSecond, *rateLimitBurst)
+	hardwareAuth := ingress.NewTokenAuthenticator(*apiTokens)
+	if !hardwareAuth.Configured() {
+		log.Println("warning: -api-tokens is empty — POST /api/ingress/hardware is open to any caller with no authentication")
+	}
 
 	var store *storage.Store
 	if *simMode == "memory" {
@@ -166,7 +171,7 @@ func main() {
 	mux.HandleFunc("/ws/telemetry", telemetryHub.ServeWS)
 	mux.HandleFunc("/ws/control", controlHub.ServeWS)
 	mux.HandleFunc("/api/simulate-rupture", control.SimulateRuptureHandler(controlHub, radar))
-	mux.HandleFunc("/api/ingress/hardware", ingress.NewHardwareHandler(pool))
+	mux.HandleFunc("/api/ingress/hardware", hardwareAuth.Middleware(ingress.NewHardwareHandler(pool)))
 	mux.HandleFunc("/api/v1/alert", alertHandler(controlHub))
 	mux.HandleFunc("/api/health", healthHandler(pool, store, radar, telemetryHub, controlHub))
 	httpServer := &http.Server{Addr: *httpAddr, Handler: withCORS(originAllowed, limiter.Middleware(mux))}
@@ -183,7 +188,7 @@ func main() {
 	}()
 
 	go func() {
-		log.Printf("ne-pulse dashboard/control/ingress HTTP server listening on %s (ws:/ws/telemetry, ws:/ws/control, POST:/api/simulate-rupture, POST:/api/ingress/hardware, rate-limit=%.0f req/s burst=%d per IP)", *httpAddr, *rateLimitPerSecond, *rateLimitBurst)
+		log.Printf("ne-pulse dashboard/control/ingress HTTP server listening on %s (ws:/ws/telemetry, ws:/ws/control, POST:/api/simulate-rupture, POST:/api/ingress/hardware, rate-limit=%.0f req/s burst=%d per IP, hardware-ingress-auth=%v)", *httpAddr, *rateLimitPerSecond, *rateLimitBurst, hardwareAuth.Configured())
 		if err := httpServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Fatalf("http server exited with error: %v", err)
 		}

@@ -5,6 +5,7 @@ import (
 
 	"ne-pulse/internal/detector"
 	"ne-pulse/internal/ingest"
+	"ne-pulse/internal/storage"
 )
 
 // DashboardConsumer adapts an Aggregator into an ingest.Consumer: it counts
@@ -24,7 +25,14 @@ func newDashboardConsumer(aggregator *Aggregator, indexer detector.CellIndexer) 
 
 func (c *DashboardConsumer) Consume(_ context.Context, frame *ingest.TelemetryFrame) {
 	cellID := c.indexer.CellID(frame.Latitude, frame.Longitude)
-	c.buffer[cellID]++
+	magnitude := storage.VectorNorm(frame.AccX, frame.AccY, frame.AccZ)
+
+	stat := c.buffer[cellID]
+	stat.Count++
+	if magnitude > stat.MaxMagnitude {
+		stat.MaxMagnitude = magnitude
+	}
+	c.buffer[cellID] = stat
 }
 
 func (c *DashboardConsumer) Flush(_ context.Context) {

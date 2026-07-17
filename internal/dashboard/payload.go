@@ -14,14 +14,18 @@ import (
 	"ne-pulse/internal/solver"
 )
 
-// CellWeight is one geographic cell's activity count for the current
-// aggregation window, with its centroid already resolved server-side so
-// the frontend needs no H3/geodesic logic of its own to place a marker.
+// CellWeight is one geographic cell's activity for the current aggregation
+// window, with its centroid already resolved server-side so the frontend
+// needs no H3/geodesic logic of its own to place a marker. Weight is the
+// number of readings that landed in the cell; MaxMagnitude is the strongest
+// single acceleration-vector norm (m/s^2) seen among them, so the map can
+// distinguish a cell full of gentle taps from one with a single sharp jolt.
 type CellWeight struct {
-	CellID string  `json:"cellId"`
-	Lat    float64 `json:"lat"`
-	Lng    float64 `json:"lng"`
-	Weight int     `json:"weight"`
+	CellID       string  `json:"cellId"`
+	Lat          float64 `json:"lat"`
+	Lng          float64 `json:"lng"`
+	Weight       int     `json:"weight"`
+	MaxMagnitude float64 `json:"maxMagnitude"`
 }
 
 // TelemetrySnapshot is the periodic, aggregated broadcast: active cell
