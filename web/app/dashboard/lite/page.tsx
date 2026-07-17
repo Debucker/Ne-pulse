@@ -17,16 +17,44 @@ import { Moon, ShieldCheck, Siren, Sun, TriangleAlert } from "lucide-react";
 import DashboardNav from "@/components/dashboard/DashboardNav";
 import { useWakeLock } from "@/lib/useWakeLock";
 
-// A real, sudden earthquake jolt reliably exceeds 1.2g of *raw*
-// accelerometer magnitude (including gravity's own resting ~1g).
-// Deliberately simple and orientation-independent, unlike a
-// gravity-cancelled/EMA-baselined reading: this alarm's whole purpose is to
-// keep working correctly on a phone sitting still on a nightstand, where
-// never missing a real violent shake matters far more than a perfectly
-// tuned false-positive rate.
-const EARTHQUAKE_THRESHOLD_G = 1.2;
 const METERS_PER_SECOND_SQUARED_PER_G = 9.80665;
-const THRESHOLD_MS2 = EARTHQUAKE_THRESHOLD_G * METERS_PER_SECOND_SQUARED_PER_G;
+
+// --- Seismic detection physics -----------------------------------------
+//
+// A single instantaneous acceleration spike (a desk bump, a firm keystroke)
+// can easily exceed a flat g threshold for one sample and mean nothing —
+// real shaking is defined by being *sustained*, not by any one peak. This
+// engine tracks that distinction directly instead of reacting to spikes:
+//
+// 1. DC-blocking filter: gravity itself isn't a constant to subtract — it's
+//    whatever axis the phone currently happens to be resting on, which
+//    changes with orientation. GRAVITY_FILTER_ALPHA runs a slow-moving
+//    average of the raw reading and treats that running average *as*
+//    gravity, continuously re-isolating it regardless of how the phone is
+//    oriented right now.
+// 2. Leaky integrator: rather than comparing the instantaneous dynamic
+//    magnitude to a threshold, it accumulates as "energy" over time and
+//    continuously drains at a fixed rate. A brief spike barely dents the
+//    integral before leaking away; sustained shaking outpaces the leak and
+//    climbs toward the trigger threshold.
+const GRAVITY_FILTER_ALPHA = 0.8;
+const NOISE_FLOOR_G = 0.05; // ignore sensor noise/tiny vibrations below this
+const LEAK_RATE_PER_SECOND = 0.5; // energy dissipated per second
+const ENERGY_TRIGGER_THRESHOLD = 1.5;
+const UI_THROTTLE_MS = 200; // how often the live g-force/energy readout re-renders, not the physics itself
+// Caps a single frame's dt — without this, a devicemotion event arriving
+// after the OS throttled/backgrounded this tab for a while would compute a
+// huge dt on its first tick back, and even a small magnitude reading times
+// a huge dt can dump a spurious energy spike straight into the integrator
+// and false-trigger the alarm purely from having been backgrounded.
+const MAX_DT_SECONDS = 0.2;
+
+interface MotionPhysics {
+  gravity: { x: number; y: number; z: number };
+  energy: number;
+  lastTime: number;
+  lastUiUpdate: number;
+}
 
 const SIREN_LOW_HZ = 500;
 const SIREN_HIGH_HZ = 1400;
@@ -128,12 +156,26 @@ export default function LiteDashboardPage() {
   const [isTest, setIsTest] = useState(false);
   const [peakG, setPeakG] = useState(0);
   const [currentG, setCurrentG] = useState(0);
+  const [currentEnergy, setCurrentEnergy] = useState(0);
   const [wakeLockEnabled, setWakeLockEnabled] = useState(false);
 
   const wakeLock = useWakeLock();
   const siren = useSiren();
   const alertActiveRef = useRef(false);
   alertActiveRef.current = alertActive;
+
+  // Every physics variable that changes on every single accelerometer
+  // sample (often 60Hz+) lives here, in a ref — never in React state.
+  // Mutating a ref doesn't schedule a re-render, which is the whole point:
+  // the filter/integrator math below runs on every sample regardless, but
+  // only the two throttled setCurrentG/setCurrentEnergy calls (at most
+  // every UI_THROTTLE_MS) and an eventual triggerAlert() ever touch state.
+  const physicsRef = useRef<MotionPhysics>({
+    gravity: { x: 0, y: 0, z: 0 },
+    energy: 0,
+    lastTime: Date.now(),
+    lastUiUpdate: 0,
+  });
 
   const triggerAlert = useCallback(
     (test: boolean, magnitude: number) => {
@@ -156,16 +198,60 @@ export default function LiteDashboardPage() {
 
   const handleMotion = useCallback(
     (event: DeviceMotionEvent) => {
+      // accelerationIncludingGravity (not the gravity-excluded
+      // `acceleration`, which many Android browsers never populate at all)
+      // is the one field reliably present cross-browser/cross-device — the
+      // DC-blocking filter below is what isolates the dynamic component
+      // from it ourselves, rather than depending on the browser to.
       const acc = event.accelerationIncludingGravity;
       if (!acc) return;
-      const x = acc.x ?? 0;
-      const y = acc.y ?? 0;
-      const z = acc.z ?? 0;
-      const magnitudeMs2 = Math.sqrt(x * x + y * y + z * z);
-      const g = magnitudeMs2 / METERS_PER_SECOND_SQUARED_PER_G;
-      setCurrentG(g);
-      if (magnitudeMs2 > THRESHOLD_MS2) {
-        triggerAlert(false, g);
+      const ax = acc.x ?? 0;
+      const ay = acc.y ?? 0;
+      const az = acc.z ?? 0;
+
+      const physics = physicsRef.current;
+      const now = Date.now();
+      const dt = Math.min((now - physics.lastTime) / 1000, MAX_DT_SECONDS);
+      physics.lastTime = now;
+
+      // DC-blocking filter: a running estimate of gravity, continuously
+      // smoothed toward whatever the raw reading currently is. Subtracting
+      // it back out of the raw reading isolates just the phone's own
+      // dynamic motion, regardless of which axis gravity currently sits on.
+      physics.gravity.x = GRAVITY_FILTER_ALPHA * physics.gravity.x + (1 - GRAVITY_FILTER_ALPHA) * ax;
+      physics.gravity.y = GRAVITY_FILTER_ALPHA * physics.gravity.y + (1 - GRAVITY_FILTER_ALPHA) * ay;
+      physics.gravity.z = GRAVITY_FILTER_ALPHA * physics.gravity.z + (1 - GRAVITY_FILTER_ALPHA) * az;
+
+      const dynX = ax - physics.gravity.x;
+      const dynY = ay - physics.gravity.y;
+      const dynZ = az - physics.gravity.z;
+      const magnitude = Math.sqrt(dynX * dynX + dynY * dynY + dynZ * dynZ) / METERS_PER_SECOND_SQUARED_PER_G;
+
+      // Leaky integrator: accumulate sustained shaking as "energy" rather
+      // than reacting to any single sample. A desk bump is a brief,
+      // high-magnitude, near-zero-duration event — it barely dents the
+      // integral before leaking away. Real shaking sustains the magnitude
+      // across many samples, so energy climbs faster than it leaks.
+      if (magnitude > NOISE_FLOOR_G) {
+        physics.energy += magnitude * dt;
+      }
+      physics.energy = Math.max(0, physics.energy - LEAK_RATE_PER_SECOND * dt);
+
+      // Everything above ran on every single sensor sample but touched no
+      // React state at all — only this throttled pair of state updates
+      // ever schedules a re-render, at most once every UI_THROTTLE_MS.
+      if (now - physics.lastUiUpdate >= UI_THROTTLE_MS) {
+        physics.lastUiUpdate = now;
+        setCurrentG(magnitude);
+        setCurrentEnergy(physics.energy);
+      }
+
+      if (physics.energy > ENERGY_TRIGGER_THRESHOLD) {
+        // Fresh start the instant it fires — otherwise any residual energy
+        // that hadn't fully leaked away yet would immediately re-trigger
+        // the alert the moment the user dismisses it.
+        physics.energy = 0;
+        triggerAlert(false, magnitude);
       }
     },
     [triggerAlert],
@@ -234,7 +320,7 @@ export default function LiteDashboardPage() {
         {permission !== "granted" ? (
           <SetupScreen permission={permission} onActivate={activate} />
         ) : (
-          <ArmedScreen currentG={currentG} onTest={() => triggerAlert(true, currentG)} />
+          <ArmedScreen currentG={currentG} currentEnergy={currentEnergy} onTest={() => triggerAlert(true, currentG)} />
         )}
       </div>
 
@@ -272,7 +358,16 @@ function SetupScreen({ permission, onActivate }: { permission: Permission; onAct
   );
 }
 
-function ArmedScreen({ currentG, onTest }: { currentG: number; onTest: () => void }) {
+function ArmedScreen({
+  currentG,
+  currentEnergy,
+  onTest,
+}: {
+  currentG: number;
+  currentEnergy: number;
+  onTest: () => void;
+}) {
+  const energyPercent = Math.min(100, (currentEnergy / ENERGY_TRIGGER_THRESHOLD) * 100);
   return (
     <main className="mx-auto flex h-full max-w-md flex-col items-center justify-center gap-6 p-6 text-center">
       <div className="flex items-center gap-2 rounded-full border border-emerald-500/40 bg-emerald-500/10 px-4 py-1.5 text-xs font-semibold uppercase tracking-wide text-emerald-400">
@@ -280,10 +375,22 @@ function ArmedScreen({ currentG, onTest }: { currentG: number; onTest: () => voi
         Armed — Monitoring
       </div>
 
-      <div>
+      <div className="w-full">
         <div className="text-5xl font-bold tabular-nums text-slate-100">{currentG.toFixed(2)}g</div>
         <div className="mt-1 text-xs uppercase tracking-wide text-slate-500">
-          Live acceleration · alarm fires above {EARTHQUAKE_THRESHOLD_G}g
+          Live dynamic acceleration, gravity-isolated
+        </div>
+
+        <div className="mt-4 h-2 w-full overflow-hidden rounded-full bg-slate-800">
+          <div
+            className={`h-full rounded-full transition-all duration-200 ${
+              energyPercent > 66 ? "bg-red-500" : energyPercent > 33 ? "bg-amber-500" : "bg-emerald-500"
+            }`}
+            style={{ width: `${energyPercent}%` }}
+          />
+        </div>
+        <div className="mt-1 text-xs uppercase tracking-wide text-slate-500">
+          Sustained shake energy — fires on sustained shaking, not single bumps
         </div>
       </div>
 
