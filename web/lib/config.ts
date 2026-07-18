@@ -68,3 +68,14 @@ export const TELEMETRY_WS_URL = `${WS_URL}/ws/telemetry`;
 export const SIMULATE_RUPTURE_URL = `${API_URL}/api/simulate-rupture`;
 export const HARDWARE_INGRESS_URL = `${API_URL}/api/ingress/hardware`;
 export const ALERT_URL = `${API_URL}/api/v1/alert`;
+
+// Optional X-API-Token sent by browser-based hardware-ingress callers (the
+// Lite dashboard's crowdsourced mesh telemetry). IMPORTANT: any
+// NEXT_PUBLIC_* value is inlined into the shipped JS bundle and readable by
+// anyone via view-source -- this cannot function as a real per-partner
+// secret the way a token issued to an actual ESP32 rig can. It only makes
+// sense as one shared, low-stakes "this traffic came from our own web app"
+// token, provisioned separately from real hardware-partner tokens in
+// -api-tokens, understanding it's effectively public. Leave unset to send
+// no auth header at all, matching the endpoint's open-by-default behavior.
+export const HARDWARE_API_TOKEN = process.env.NEXT_PUBLIC_HARDWARE_API_TOKEN ?? "";

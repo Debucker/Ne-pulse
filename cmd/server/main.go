@@ -288,7 +288,15 @@ func withCORS(originAllowed func(r *http.Request) bool, next http.Handler) http.
 			w.Header().Set("Access-Control-Allow-Origin", origin)
 		}
 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-		w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+		// X-API-Token is here alongside Content-Type because it's a
+		// non-simple header: a browser sending it cross-origin (e.g. the
+		// Lite dashboard's crowdsourced telemetry, Vercel frontend -> Render
+		// backend) preflights first, and silently drops the real request if
+		// the preflight response doesn't list every header the actual
+		// request will send -- Content-Type alone was already enough to
+		// force a preflight (application/json isn't CORS-safelisted), so
+		// this costs nothing extra for existing callers.
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, X-API-Token")
 		if r.Method == http.MethodOptions {
 			w.WriteHeader(http.StatusNoContent)
 			return

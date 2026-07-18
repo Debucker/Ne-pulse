@@ -13,9 +13,12 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Moon, ShieldCheck, Siren, Sun, TriangleAlert } from "lucide-react";
+import { Moon, Radio, ShieldCheck, Siren, Sun, TriangleAlert } from "lucide-react";
 import DashboardNav from "@/components/dashboard/DashboardNav";
+import HomeLocationSelect from "@/components/dashboard/HomeLocationSelect";
+import { HARDWARE_API_TOKEN, HARDWARE_INGRESS_URL } from "@/lib/config";
 import { useWakeLock } from "@/lib/useWakeLock";
+import { DEFAULT_HOME_REGION, UZBEKISTAN_REGIONS, type Region } from "@/lib/uzbekistanRegions";
 
 const METERS_PER_SECOND_SQUARED_PER_G = 9.80665;
 
@@ -48,6 +51,59 @@ const UI_THROTTLE_MS = 200; // how often the live g-force/energy readout re-rend
 // a huge dt can dump a spurious energy spike straight into the integrator
 // and false-trigger the alarm purely from having been backgrounded.
 const MAX_DT_SECONDS = 0.2;
+
+// --- Crowdsourced mesh telemetry ----------------------------------------
+//
+// Optional, opt-in: while armed, if the user has turned this on, every
+// devicemotion sample that clears the same NOISE_FLOOR_G used by the local
+// alarm's own integrator also gets forwarded to the backend's hardware
+// ingress endpoint -- an ordinary phone on a nightstand becomes one more
+// node the H3 radar's coincidence detector can count, exactly like a real
+// ESP32/MPU6050 rig. This is a *contribution* to the network-wide detector,
+// entirely separate from (and never gating) this page's own local,
+// offline-first alarm above.
+const DEVICE_ID_STORAGE_KEY = "nepulse_device_id";
+const MESH_ENABLED_STORAGE_KEY = "nepulse_mesh_enabled";
+const MESH_REGION_STORAGE_KEY = "nepulse_mesh_region";
+// Caps outbound requests to at most once per second during sustained
+// shaking -- the coincidence detector needs many *independent devices*
+// agreeing, not a high sample rate from any single one, so anything faster
+// than this would just be wasted network traffic against the same signal.
+const MESH_TRANSMIT_THROTTLE_MS = 1000;
+
+function getOrCreateDeviceId(): string {
+  const existing = localStorage.getItem(DEVICE_ID_STORAGE_KEY);
+  if (existing) return existing;
+  const created = crypto.randomUUID();
+  localStorage.setItem(DEVICE_ID_STORAGE_KEY, created);
+  return created;
+}
+
+// Fire-and-forget: a dropped or failed frame from one nightstand phone is
+// meaningless to retry or queue -- the radar only cares whether *enough
+// independent devices* reported a shock within the same short window, not
+// whether any one of them delivered every sample. keepalive lets the
+// request still complete even if this tab is backgrounded/torn down right
+// after a sample fires.
+function transmitTelemetry(deviceId: string, region: Region, ax: number, ay: number, az: number) {
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (HARDWARE_API_TOKEN) headers["X-API-Token"] = HARDWARE_API_TOKEN;
+
+  fetch(HARDWARE_INGRESS_URL, {
+    method: "POST",
+    headers,
+    // lat/lng deliberately come from the user's coarse, self-selected
+    // region (see HomeLocationSelect), not real geolocation -- this app's
+    // Permissions-Policy blocks the geolocation API outright, and even if
+    // it didn't, precise GPS isn't necessary (or desirable, for an
+    // anonymous contributor) just to bucket a reading into an H3 cell.
+    // ax/ay/az are sent raw (gravity still included), matching exactly
+    // what a real ESP32/MPU6050 rig would send and what the backend's own
+    // magnitude formula (storage.VectorNorm) expects.
+    body: JSON.stringify({ deviceId, lat: region.lat, lng: region.lng, ax, ay, az }),
+    keepalive: true,
+  }).catch(() => {});
+}
 
 interface MotionPhysics {
   gravity: { x: number; y: number; z: number };
@@ -158,11 +214,56 @@ export default function LiteDashboardPage() {
   const [currentG, setCurrentG] = useState(0);
   const [currentEnergy, setCurrentEnergy] = useState(0);
   const [wakeLockEnabled, setWakeLockEnabled] = useState(false);
+  const [meshEnabled, setMeshEnabled] = useState(false);
+  const [meshRegion, setMeshRegion] = useState<Region>(DEFAULT_HOME_REGION);
 
   const wakeLock = useWakeLock();
   const siren = useSiren();
   const alertActiveRef = useRef(false);
   alertActiveRef.current = alertActive;
+  // "Armed" here means the monitoring state (devicemotion listener live,
+  // "Armed — Monitoring" badge showing) — the same gate that must hold
+  // before handleMotion ever runs at all, kept as its own ref (rather than
+  // read from the permission state directly) purely to mirror the
+  // established alertActiveRef/physicsRef pattern this file already uses:
+  // handleMotion is one stable callback, registered once, so anything it
+  // needs to react to must be read from a ref, never captured by value.
+  const armedRef = useRef(false);
+  armedRef.current = permission === "granted";
+  const meshEnabledRef = useRef(false);
+  meshEnabledRef.current = meshEnabled;
+  const meshRegionRef = useRef<Region>(meshRegion);
+  meshRegionRef.current = meshRegion;
+  const deviceIdRef = useRef("");
+  const lastMeshTransmitRef = useRef(0);
+
+  // Hydrate the persistent device id and any saved mesh preferences after
+  // mount — localStorage doesn't exist during this page's static/server
+  // render, so touching it during the initial render (rather than in an
+  // effect) would break the build.
+  useEffect(() => {
+    deviceIdRef.current = getOrCreateDeviceId();
+
+    const storedMeshEnabled = localStorage.getItem(MESH_ENABLED_STORAGE_KEY);
+    if (storedMeshEnabled !== null) setMeshEnabled(storedMeshEnabled === "true");
+
+    const storedRegionName = localStorage.getItem(MESH_REGION_STORAGE_KEY);
+    const storedRegion = UZBEKISTAN_REGIONS.find((r) => r.name === storedRegionName);
+    if (storedRegion) setMeshRegion(storedRegion);
+  }, []);
+
+  function toggleMesh() {
+    setMeshEnabled((prev) => {
+      const next = !prev;
+      localStorage.setItem(MESH_ENABLED_STORAGE_KEY, String(next));
+      return next;
+    });
+  }
+
+  function changeMeshRegion(region: Region) {
+    setMeshRegion(region);
+    localStorage.setItem(MESH_REGION_STORAGE_KEY, region.name);
+  }
 
   // Every physics variable that changes on every single accelerometer
   // sample (often 60Hz+) lives here, in a ref — never in React state.
@@ -234,6 +335,16 @@ export default function LiteDashboardPage() {
       // across many samples, so energy climbs faster than it leaks.
       if (magnitude > NOISE_FLOOR_G) {
         physics.energy += magnitude * dt;
+
+        // Crowdsourced mesh contribution — entirely independent of the
+        // leaky integrator above (never gates or is gated by this
+        // device's own local trigger): while armed and opted in, forward
+        // this sample to the backend, throttled to at most once/second so
+        // sustained shaking doesn't fire 60 requests/sec.
+        if (meshEnabledRef.current && armedRef.current && now - lastMeshTransmitRef.current >= MESH_TRANSMIT_THROTTLE_MS) {
+          lastMeshTransmitRef.current = now;
+          transmitTelemetry(deviceIdRef.current, meshRegionRef.current, ax, ay, az);
+        }
       }
       physics.energy = Math.max(0, physics.energy - LEAK_RATE_PER_SECOND * dt);
 
@@ -299,20 +410,36 @@ export default function LiteDashboardPage() {
 
       <DashboardNav
         right={
-          <button
-            type="button"
-            onClick={toggleWakeLock}
-            disabled={!wakeLock.supported}
-            title={wakeLock.supported ? "Keep the screen on while armed" : "Wake Lock isn't supported in this browser"}
-            className={`flex items-center gap-2 rounded-md border px-2.5 py-1.5 text-xs font-medium transition sm:px-3 ${
-              wakeLockEnabled
-                ? "border-cyan-500/60 bg-cyan-500/10 text-cyan-300"
-                : "border-slate-700 bg-slate-900 text-slate-300 hover:border-cyan-500/60 hover:text-cyan-400"
-            } ${!wakeLock.supported ? "cursor-not-allowed opacity-40" : ""}`}
-          >
-            {wakeLockEnabled ? <Sun size={14} /> : <Moon size={14} />}
-            <span className="hidden sm:inline">Screen Lock {wakeLockEnabled ? "On" : "Off"}</span>
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={toggleMesh}
+              title="Share throttled, anonymous motion readings with the NE-PULSE network while armed"
+              aria-pressed={meshEnabled}
+              className={`flex items-center gap-2 rounded-md border px-2.5 py-1.5 text-xs font-medium transition sm:px-3 ${
+                meshEnabled
+                  ? "border-emerald-500/60 bg-emerald-500/10 text-emerald-300"
+                  : "border-slate-700 bg-slate-900 text-slate-300 hover:border-emerald-500/60 hover:text-emerald-400"
+              }`}
+            >
+              <Radio size={14} />
+              <span className="hidden sm:inline">Mesh {meshEnabled ? "On" : "Off"}</span>
+            </button>
+            <button
+              type="button"
+              onClick={toggleWakeLock}
+              disabled={!wakeLock.supported}
+              title={wakeLock.supported ? "Keep the screen on while armed" : "Wake Lock isn't supported in this browser"}
+              className={`flex items-center gap-2 rounded-md border px-2.5 py-1.5 text-xs font-medium transition sm:px-3 ${
+                wakeLockEnabled
+                  ? "border-cyan-500/60 bg-cyan-500/10 text-cyan-300"
+                  : "border-slate-700 bg-slate-900 text-slate-300 hover:border-cyan-500/60 hover:text-cyan-400"
+              } ${!wakeLock.supported ? "cursor-not-allowed opacity-40" : ""}`}
+            >
+              {wakeLockEnabled ? <Sun size={14} /> : <Moon size={14} />}
+              <span className="hidden sm:inline">Screen Lock {wakeLockEnabled ? "On" : "Off"}</span>
+            </button>
+          </div>
         }
       />
 
@@ -320,7 +447,14 @@ export default function LiteDashboardPage() {
         {permission !== "granted" ? (
           <SetupScreen permission={permission} onActivate={activate} />
         ) : (
-          <ArmedScreen currentG={currentG} currentEnergy={currentEnergy} onTest={() => triggerAlert(true, currentG)} />
+          <ArmedScreen
+            currentG={currentG}
+            currentEnergy={currentEnergy}
+            onTest={() => triggerAlert(true, currentG)}
+            meshEnabled={meshEnabled}
+            meshRegion={meshRegion}
+            onMeshRegionChange={changeMeshRegion}
+          />
         )}
       </div>
 
@@ -362,10 +496,16 @@ function ArmedScreen({
   currentG,
   currentEnergy,
   onTest,
+  meshEnabled,
+  meshRegion,
+  onMeshRegionChange,
 }: {
   currentG: number;
   currentEnergy: number;
   onTest: () => void;
+  meshEnabled: boolean;
+  meshRegion: Region;
+  onMeshRegionChange: (region: Region) => void;
 }) {
   const energyPercent = Math.min(100, (currentEnergy / ENERGY_TRIGGER_THRESHOLD) * 100);
   return (
@@ -401,6 +541,21 @@ function ArmedScreen({
       >
         <Siren size={16} /> Test Alarm (Siren + Strobe)
       </button>
+
+      {meshEnabled && (
+        <div className="w-full rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-3 text-left">
+          <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-emerald-400">
+            <Radio size={12} /> Contributing to Mesh Network
+          </div>
+          <p className="mt-1 text-xs text-slate-400">
+            Sustained shaking on this device is anonymously reported to NE-PULSE, tagged with a
+            general region only — never your precise location.
+          </p>
+          <div className="mt-2">
+            <HomeLocationSelect value={meshRegion} onChange={onMeshRegionChange} />
+          </div>
+        </div>
+      )}
 
       <p className="text-xs text-slate-500">
         Keep this device plugged in and the screen-lock toggle on (top right) so the OS never dims or

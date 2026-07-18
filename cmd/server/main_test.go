@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"ne-pulse/internal/hub"
@@ -127,6 +128,30 @@ func TestWithCORS_HandlesOptionsPreflightWithNoContent(t *testing.T) {
 	}
 	if called {
 		t.Error("the wrapped handler should not run for an OPTIONS preflight")
+	}
+}
+
+func TestWithCORS_AllowsXAPITokenHeaderForCrossOriginHardwareIngress(t *testing.T) {
+	// A browser sending X-API-Token cross-origin (the Lite dashboard's
+	// crowdsourced telemetry, hosted on a different origin than this
+	// server) preflights first, and silently drops the real request if this
+	// header isn't listed here -- regardless of whether the server would
+	// have accepted the token itself.
+	allowed := newOriginChecker(defaultAllowedOrigins)
+	handler := withCORS(allowed, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	req := httptest.NewRequest(http.MethodOptions, "/api/ingress/hardware", nil)
+	req.Header.Set("Origin", "https://ne-pulse.com")
+	req.Header.Set("Access-Control-Request-Method", "POST")
+	req.Header.Set("Access-Control-Request-Headers", "content-type,x-api-token")
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+
+	got := rec.Header().Get("Access-Control-Allow-Headers")
+	if !strings.Contains(strings.ToLower(got), "x-api-token") {
+		t.Errorf("Access-Control-Allow-Headers = %q, want it to include X-API-Token", got)
 	}
 }
 
