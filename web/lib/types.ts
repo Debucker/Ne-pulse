@@ -8,6 +8,8 @@ export interface CellWeight {
   lat: number;
   lng: number;
   weight: number;
+  /** Peak acceleration-vector norm (m/s^2) seen in this cell during the aggregation window. */
+  maxMagnitude: number;
 }
 
 export interface TelemetrySnapshot {

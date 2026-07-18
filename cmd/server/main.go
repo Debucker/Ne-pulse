@@ -172,6 +172,7 @@ func main() {
 	mux.HandleFunc("/ws/control", controlHub.ServeWS)
 	mux.HandleFunc("/api/simulate-rupture", control.SimulateRuptureHandler(controlHub, radar))
 	mux.HandleFunc("/api/ingress/hardware", hardwareAuth.Middleware(ingress.NewHardwareHandler(pool)))
+	mux.HandleFunc("/api/v1/docs", ingress.NewDocsHandler())
 	mux.HandleFunc("/api/v1/alert", alertHandler(controlHub))
 	mux.HandleFunc("/api/health", healthHandler(pool, store, radar, telemetryHub, controlHub))
 	httpServer := &http.Server{Addr: *httpAddr, Handler: withCORS(originAllowed, limiter.Middleware(mux))}
@@ -188,7 +189,7 @@ func main() {
 	}()
 
 	go func() {
-		log.Printf("ne-pulse dashboard/control/ingress HTTP server listening on %s (ws:/ws/telemetry, ws:/ws/control, POST:/api/simulate-rupture, POST:/api/ingress/hardware, rate-limit=%.0f req/s burst=%d per IP, hardware-ingress-auth=%v)", *httpAddr, *rateLimitPerSecond, *rateLimitBurst, hardwareAuth.Configured())
+		log.Printf("ne-pulse dashboard/control/ingress HTTP server listening on %s (ws:/ws/telemetry, ws:/ws/control, POST:/api/simulate-rupture, POST:/api/ingress/hardware, GET:/api/v1/docs, rate-limit=%.0f req/s burst=%d per IP, hardware-ingress-auth=%v)", *httpAddr, *rateLimitPerSecond, *rateLimitBurst, hardwareAuth.Configured())
 		if err := httpServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Fatalf("http server exited with error: %v", err)
 		}

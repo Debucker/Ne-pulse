@@ -6,6 +6,13 @@ import type { CellWeight } from "./types";
 const LAT_RANGE: [number, number] = [37.0, 45.6];
 const LNG_RANGE: [number, number] = [56.0, 73.2];
 
+// Roughly gravity-only-at-rest (real hardware sends raw ax/ay/az, so a
+// stationary MPU6050 alone already reads ~9.8 m/s^2) up to the ingress
+// handler's hard ceiling of +-5g (~49.03 m/s^2, see
+// internal/ingress/hardware.go's maxAccelerationMS2) -- so stress-test
+// nodes exercise the map's full calm-to-severe color ramp.
+const MAGNITUDE_RANGE: [number, number] = [9.8, 49.0];
+
 export const STRESS_TEST_NODE_COUNT = 320;
 
 function randomInRange([min, max]: [number, number]): number {
@@ -28,5 +35,6 @@ export function generateStressTestCells(count: number = STRESS_TEST_NODE_COUNT):
     // "21.124234256135325 active readings") straight into the map's
     // tooltips.
     weight: Math.round(1 + Math.random() * 24),
+    maxMagnitude: randomInRange(MAGNITUDE_RANGE),
   }));
 }

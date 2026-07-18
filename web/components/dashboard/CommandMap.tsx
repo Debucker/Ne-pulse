@@ -75,6 +75,46 @@ function weightToOpacity(weight: number): number {
   return Math.min(0.15 + weight * 0.03, 0.85);
 }
 
+// Calm end of the color ramp: roughly gravity-only-at-rest, since real
+// hardware nodes send raw (not gravity-subtracted) acceleration -- a
+// stationary device already reads ~9.8 m/s^2, not 0.
+const MAGNITUDE_CALM_MS2 = 10;
+// Severe end of the ramp: the ingress handler's hard ceiling of +-5g
+// (internal/ingress/hardware.go's maxAccelerationMS2) -- the strongest
+// reading the backend will ever accept.
+const MAGNITUDE_SEVERE_MS2 = 49.03;
+
+const COLOR_CALM: [number, number, number] = [34, 197, 94]; // Tailwind green-500
+const COLOR_MODERATE: [number, number, number] = [245, 158, 11]; // Tailwind amber-500
+const COLOR_SEVERE: [number, number, number] = [239, 68, 68]; // Tailwind red-500 (matches the existing epicenter marker)
+
+function lerp(a: number, b: number, t: number): number {
+  return a + (b - a) * t;
+}
+
+function lerpColor(from: [number, number, number], to: [number, number, number], t: number): string {
+  const r = Math.round(lerp(from[0], to[0], t));
+  const g = Math.round(lerp(from[1], to[1], t));
+  const b = Math.round(lerp(from[2], to[2], t));
+  return `rgb(${r}, ${g}, ${b})`;
+}
+
+/**
+ * Maps a cell's peak acceleration magnitude onto a calm-to-severe color
+ * ramp (green -> amber -> red), independent of how many readings landed in
+ * the cell -- weight (encoded as radius/base opacity) and magnitude
+ * (encoded as color) are deliberately separate channels, so a cell with one
+ * violent jolt doesn't look identical to one with many gentle taps just
+ * because both happen to have the same device count.
+ */
+function magnitudeToColor(maxMagnitude: number): string {
+  const t = Math.min(
+    Math.max((maxMagnitude - MAGNITUDE_CALM_MS2) / (MAGNITUDE_SEVERE_MS2 - MAGNITUDE_CALM_MS2), 0),
+    1,
+  );
+  return t < 0.5 ? lerpColor(COLOR_CALM, COLOR_MODERATE, t * 2) : lerpColor(COLOR_MODERATE, COLOR_SEVERE, (t - 0.5) * 2);
+}
+
 // A tiny deterministic PRNG seeded off the rupture's own trigger timestamp,
 // so the sensor-burst cluster's jitter is stable across re-renders of the
 // *same* rupture (no reshuffling every 100ms tick) but different from one
@@ -150,23 +190,26 @@ export default function CommandMap({
       <FitUzbekistanOnMount />
       <DoubleClickTrigger onDoubleClick={onMapDoubleClick} />
 
-      {cells.map((cell) => (
-        <CircleMarker
-          key={cell.cellId}
-          center={[cell.lat, cell.lng]}
-          radius={weightToRadius(cell.weight)}
-          pathOptions={{
-            color: "#3b82f6",
-            fillColor: "#3b82f6",
-            fillOpacity: weightToOpacity(cell.weight),
-            weight: 1,
-          }}
-        >
-          <Tooltip direction="top" opacity={0.9}>
-            {cell.weight} active reading{cell.weight === 1 ? "" : "s"}
-          </Tooltip>
-        </CircleMarker>
-      ))}
+      {cells.map((cell) => {
+        const intensityColor = magnitudeToColor(cell.maxMagnitude);
+        return (
+          <CircleMarker
+            key={cell.cellId}
+            center={[cell.lat, cell.lng]}
+            radius={weightToRadius(cell.weight)}
+            pathOptions={{
+              color: intensityColor,
+              fillColor: intensityColor,
+              fillOpacity: weightToOpacity(cell.weight),
+              weight: 1,
+            }}
+          >
+            <Tooltip direction="top" opacity={0.9}>
+              {cell.weight} active reading{cell.weight === 1 ? "" : "s"} &middot; peak {cell.maxMagnitude.toFixed(1)} m/s&sup2;
+            </Tooltip>
+          </CircleMarker>
+        );
+      })}
 
       {activeAlert && (
         <>
