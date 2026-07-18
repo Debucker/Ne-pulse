@@ -1,0 +1,6 @@
+# Shell scripts must always check out with LF line endings, regardless of
+# a contributor's local core.autocrlf setting -- a CRLF shebang line
+# (#!/usr/bin/env bash\r) fails outright on Linux/Mac with "bash\r: No such
+# file or directory", which would silently break these scripts for anyone
+# who clones on Windows and runs them on the actual deploy target.
+*.sh text eol=lf
