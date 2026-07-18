@@ -13,10 +13,11 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Moon, Radio, ShieldCheck, Siren, Sun, TriangleAlert, Wifi, WifiOff } from "lucide-react";
+import { MapPin, Moon, Radio, ShieldCheck, Siren, Sun, TriangleAlert, Wifi, WifiOff } from "lucide-react";
 import DashboardNav from "@/components/dashboard/DashboardNav";
 import HomeLocationSelect from "@/components/dashboard/HomeLocationSelect";
 import { HARDWARE_API_TOKEN, HARDWARE_INGRESS_URL } from "@/lib/config";
+import { haversineKm } from "@/lib/geo";
 import { useRuptureSocket } from "@/lib/useRuptureSocket";
 import { useWakeLock } from "@/lib/useWakeLock";
 import { DEFAULT_HOME_REGION, UZBEKISTAN_REGIONS, type Region } from "@/lib/uzbekistanRegions";
@@ -65,12 +66,40 @@ const MAX_DT_SECONDS = 0.2;
 // offline-first alarm above.
 const DEVICE_ID_STORAGE_KEY = "nepulse_device_id";
 const MESH_ENABLED_STORAGE_KEY = "nepulse_mesh_enabled";
-const MESH_REGION_STORAGE_KEY = "nepulse_mesh_region";
+// Shared by mesh contribution (tags this device's outbound readings) *and*
+// geofencing below (anchors the distance check) -- one location concept,
+// two consumers, so its storage key isn't mesh-specific even though the
+// mesh block above is what first introduced region selection to this page.
+const HOME_REGION_STORAGE_KEY = "nepulse_home_region";
 // Caps outbound requests to at most once per second during sustained
 // shaking -- the coincidence detector needs many *independent devices*
 // agreeing, not a high sample rate from any single one, so anything faster
 // than this would just be wasted network traffic against the same signal.
 const MESH_TRANSMIT_THROTTLE_MS = 1000;
+
+// --- Client-side geofencing ----------------------------------------------
+//
+// /ws/telemetry broadcasts every backend-confirmed rupture to every
+// connected client globally -- without this filter, a rupture on the other
+// side of the country would sound this phone's alarm exactly as loudly as
+// one next door. distanceKm is checked against a magnitude-scaled threat
+// radius before a network alert is ever allowed to fire.
+const S_WAVE_KM_PER_SEC = 3.5; // matches useDynamicRupture.ts's same constant
+
+// NOTE ON THE WORKED EXAMPLES THIS FORMULA WAS SPECIFIED WITH: evaluated
+// exactly as given, this returns ~67km at M4.0 and ~3294km at M7.0 -- not
+// the ~25km / ~330km called out alongside it (a ~10x gap at the high end).
+// At the backend's actual magnitude ceiling (internal/detector/radar.go's
+// estimateMagnitude clamps to 8.5), it evaluates to ~23,200km -- farther
+// than any two points on Earth can ever be from each other (~20,015km, half
+// the equatorial circumference) -- meaning geofencing would never filter
+// out a maximum-magnitude event no matter where on the globe it happened.
+// Implemented exactly as specified; the constants likely need
+// recalibrating against the worked examples if ~25km/~330km was the
+// intended behavior.
+function maxThreatRadiusKm(magnitude: number): number {
+  return Math.exp(1.3 * magnitude - 1.0);
+}
 
 function getOrCreateDeviceId(): string {
   const existing = localStorage.getItem(DEVICE_ID_STORAGE_KEY);
@@ -227,7 +256,13 @@ export default function LiteDashboardPage() {
   const [currentEnergy, setCurrentEnergy] = useState(0);
   const [wakeLockEnabled, setWakeLockEnabled] = useState(false);
   const [meshEnabled, setMeshEnabled] = useState(false);
-  const [meshRegion, setMeshRegion] = useState<Region>(DEFAULT_HOME_REGION);
+  // Doubles as the geofencing anchor below, regardless of whether mesh
+  // contribution is on — a user who never enables Mesh still needs a real
+  // location for network alerts to be filtered against, not the hardcoded
+  // default silently standing in forever.
+  const [homeRegion, setHomeRegion] = useState<Region>(DEFAULT_HOME_REGION);
+  const [networkAlertInfo, setNetworkAlertInfo] = useState<{ distanceKm: number; etaSeconds: number } | null>(null);
+  const [networkEtaRemaining, setNetworkEtaRemaining] = useState(0);
 
   const wakeLock = useWakeLock();
   const siren = useSiren();
@@ -244,24 +279,29 @@ export default function LiteDashboardPage() {
   armedRef.current = permission === "granted";
   const meshEnabledRef = useRef(false);
   meshEnabledRef.current = meshEnabled;
-  const meshRegionRef = useRef<Region>(meshRegion);
-  meshRegionRef.current = meshRegion;
+  const homeRegionRef = useRef<Region>(homeRegion);
+  homeRegionRef.current = homeRegion;
   const deviceIdRef = useRef("");
   const lastMeshTransmitRef = useRef(0);
+  // Epoch ms when the S-wave is expected to reach homeRegion for the
+  // *currently displayed* network alert — fixed at trigger time (the
+  // epicenter doesn't move), ticked down for display by a separate effect
+  // below rather than recomputed from distance on every render.
+  const networkArrivalDeadlineRef = useRef<number | null>(null);
 
-  // Hydrate the persistent device id and any saved mesh preferences after
-  // mount — localStorage doesn't exist during this page's static/server
-  // render, so touching it during the initial render (rather than in an
-  // effect) would break the build.
+  // Hydrate the persistent device id and any saved preferences after mount
+  // — localStorage doesn't exist during this page's static/server render,
+  // so touching it during the initial render (rather than in an effect)
+  // would break the build.
   useEffect(() => {
     deviceIdRef.current = getOrCreateDeviceId();
 
     const storedMeshEnabled = localStorage.getItem(MESH_ENABLED_STORAGE_KEY);
     if (storedMeshEnabled !== null) setMeshEnabled(storedMeshEnabled === "true");
 
-    const storedRegionName = localStorage.getItem(MESH_REGION_STORAGE_KEY);
+    const storedRegionName = localStorage.getItem(HOME_REGION_STORAGE_KEY);
     const storedRegion = UZBEKISTAN_REGIONS.find((r) => r.name === storedRegionName);
-    if (storedRegion) setMeshRegion(storedRegion);
+    if (storedRegion) setHomeRegion(storedRegion);
   }, []);
 
   function toggleMesh() {
@@ -272,9 +312,9 @@ export default function LiteDashboardPage() {
     });
   }
 
-  function changeMeshRegion(region: Region) {
-    setMeshRegion(region);
-    localStorage.setItem(MESH_REGION_STORAGE_KEY, region.name);
+  function changeHomeRegion(region: Region) {
+    setHomeRegion(region);
+    localStorage.setItem(HOME_REGION_STORAGE_KEY, region.name);
   }
 
   // Every physics variable that changes on every single accelerometer
@@ -308,6 +348,8 @@ export default function LiteDashboardPage() {
   const dismissAlert = useCallback(() => {
     setAlertActive(false);
     siren.stop();
+    networkArrivalDeadlineRef.current = null;
+    setNetworkAlertInfo(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [siren.stop]);
 
@@ -357,7 +399,7 @@ export default function LiteDashboardPage() {
         // sustained shaking doesn't fire 60 requests/sec.
         if (meshEnabledRef.current && armedRef.current && now - lastMeshTransmitRef.current >= MESH_TRANSMIT_THROTTLE_MS) {
           lastMeshTransmitRef.current = now;
-          transmitTelemetry(deviceIdRef.current, meshRegionRef.current, ax, ay, az);
+          transmitTelemetry(deviceIdRef.current, homeRegionRef.current, ax, ay, az);
         }
       }
       physics.energy = Math.max(0, physics.energy - LEAK_RATE_PER_SECOND * dt);
@@ -403,12 +445,46 @@ export default function LiteDashboardPage() {
       // to replay after the fact either.
       return;
     }
+
+    const { epicenterLat, epicenterLng, magnitude } = latestRupture.payload;
+    const home = homeRegionRef.current;
+    const distanceKm = haversineKm(home.lat, home.lng, epicenterLat, epicenterLng);
+    const thresholdKm = maxThreatRadiusKm(magnitude);
+
+    if (distanceKm > thresholdKm) {
+      console.log(
+        `[Geofence] Ignored distant M${magnitude.toFixed(1)} rupture ${Math.round(distanceKm)}km away ` +
+          `(threat radius ~${Math.round(thresholdKm)}km from ${home.name})`,
+      );
+      return;
+    }
+
+    const etaSeconds = distanceKm / S_WAVE_KM_PER_SEC;
+    networkArrivalDeadlineRef.current = Date.now() + etaSeconds * 1000;
+    setNetworkAlertInfo({ distanceKm, etaSeconds });
+    setNetworkEtaRemaining(Math.max(0, Math.round(etaSeconds)));
+
     // Already confirmed by the backend's coincidence detector (many
     // independent devices agreeing) — bypasses this device's own local
     // physics engine entirely rather than re-deriving anything from it.
-    triggerAlert("network", latestRupture.payload.magnitude);
+    triggerAlert("network", magnitude);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ruptureVersion]);
+
+  // Ticks the on-screen countdown for an active network alert. Separate
+  // from the trigger effect above (which only runs once per new rupture)
+  // since this needs to re-render roughly every second for as long as the
+  // alert stays on screen, independent of whether any new rupture arrives.
+  useEffect(() => {
+    if (!alertActive || alertSource !== "network" || networkArrivalDeadlineRef.current === null) return;
+    const tick = () => {
+      const remaining = Math.max(0, Math.round((networkArrivalDeadlineRef.current! - Date.now()) / 1000));
+      setNetworkEtaRemaining(remaining);
+    };
+    tick();
+    const interval = setInterval(tick, 250);
+    return () => clearInterval(interval);
+  }, [alertActive, alertSource]);
 
   async function activate() {
     // A real user gesture, right here — unlocks Web Audio for the later
@@ -490,14 +566,22 @@ export default function LiteDashboardPage() {
             currentEnergy={currentEnergy}
             onTest={() => triggerAlert("test", currentG)}
             meshEnabled={meshEnabled}
-            meshRegion={meshRegion}
-            onMeshRegionChange={changeMeshRegion}
+            homeRegion={homeRegion}
+            onHomeRegionChange={changeHomeRegion}
             networkConnected={networkConnected}
           />
         )}
       </div>
 
-      {alertActive && <AlertOverlay source={alertSource} peakValue={peakValue} onDismiss={dismissAlert} />}
+      {alertActive && (
+        <AlertOverlay
+          source={alertSource}
+          peakValue={peakValue}
+          networkInfo={networkAlertInfo}
+          networkEtaRemaining={networkEtaRemaining}
+          onDismiss={dismissAlert}
+        />
+      )}
     </div>
   );
 }
@@ -536,16 +620,16 @@ function ArmedScreen({
   currentEnergy,
   onTest,
   meshEnabled,
-  meshRegion,
-  onMeshRegionChange,
+  homeRegion,
+  onHomeRegionChange,
   networkConnected,
 }: {
   currentG: number;
   currentEnergy: number;
   onTest: () => void;
   meshEnabled: boolean;
-  meshRegion: Region;
-  onMeshRegionChange: (region: Region) => void;
+  homeRegion: Region;
+  onHomeRegionChange: (region: Region) => void;
   networkConnected: boolean;
 }) {
   const energyPercent = Math.min(100, (currentEnergy / ENERGY_TRIGGER_THRESHOLD) * 100);
@@ -600,18 +684,29 @@ function ArmedScreen({
         <Siren size={16} /> Test Alarm (Siren + Strobe)
       </button>
 
+      <div className="w-full rounded-lg border border-slate-700 bg-slate-900/50 p-3 text-left">
+        <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-400">
+          <MapPin size={12} /> Your Location
+        </div>
+        <p className="mt-1 text-xs text-slate-500">
+          Used to filter network alerts to nearby ruptures only
+          {meshEnabled ? " and to tag your contributed readings" : ""} — a general region, never your precise
+          location.
+        </p>
+        <div className="mt-2">
+          <HomeLocationSelect value={homeRegion} onChange={onHomeRegionChange} />
+        </div>
+      </div>
+
       {meshEnabled && (
         <div className="w-full rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-3 text-left">
           <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-emerald-400">
             <Radio size={12} /> Contributing to Mesh Network
           </div>
           <p className="mt-1 text-xs text-slate-400">
-            Sustained shaking on this device is anonymously reported to NE-PULSE, tagged with a
-            general region only — never your precise location.
+            Sustained shaking on this device is anonymously reported to NE-PULSE, tagged with your
+            selected region above.
           </p>
-          <div className="mt-2">
-            <HomeLocationSelect value={meshRegion} onChange={onMeshRegionChange} />
-          </div>
         </div>
       )}
 
@@ -626,10 +721,14 @@ function ArmedScreen({
 function AlertOverlay({
   source,
   peakValue,
+  networkInfo,
+  networkEtaRemaining,
   onDismiss,
 }: {
   source: AlertSource;
   peakValue: number;
+  networkInfo: { distanceKm: number; etaSeconds: number } | null;
+  networkEtaRemaining: number;
   onDismiss: () => void;
 }) {
   const isTest = source === "test";
@@ -663,6 +762,17 @@ function AlertOverlay({
         <p className="mt-1 text-xs uppercase tracking-wide text-slate-400">
           {isNetwork ? `Estimated magnitude: ${peakValue.toFixed(1)}` : `Peak reading: ${peakValue.toFixed(2)}g`}
         </p>
+
+        {isNetwork && networkInfo && (
+          <div className="mt-4 rounded-lg border border-cyan-500/30 bg-cyan-500/5 p-3">
+            <p className="text-xs uppercase tracking-wide text-cyan-400">
+              Epicenter ~{Math.round(networkInfo.distanceKm)} km away
+            </p>
+            <p className="mt-1 text-2xl font-black uppercase tabular-nums text-white">
+              {networkEtaRemaining > 0 ? `Wave Arriving In ${networkEtaRemaining}s` : "Wave May Have Arrived"}
+            </p>
+          </div>
+        )}
 
         <ul className="mt-5 space-y-2 text-left text-sm text-slate-200">
           <li>• Get under a sturdy desk or table.</li>
