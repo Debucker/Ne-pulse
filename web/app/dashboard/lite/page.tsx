@@ -13,10 +13,11 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Moon, Radio, ShieldCheck, Siren, Sun, TriangleAlert } from "lucide-react";
+import { Moon, Radio, ShieldCheck, Siren, Sun, TriangleAlert, Wifi, WifiOff } from "lucide-react";
 import DashboardNav from "@/components/dashboard/DashboardNav";
 import HomeLocationSelect from "@/components/dashboard/HomeLocationSelect";
 import { HARDWARE_API_TOKEN, HARDWARE_INGRESS_URL } from "@/lib/config";
+import { useRuptureSocket } from "@/lib/useRuptureSocket";
 import { useWakeLock } from "@/lib/useWakeLock";
 import { DEFAULT_HOME_REGION, UZBEKISTAN_REGIONS, type Region } from "@/lib/uzbekistanRegions";
 
@@ -128,6 +129,13 @@ const LITE_STYLES = `
 
 type Permission = "idle" | "granted" | "denied";
 
+// "local" — this device's own accelerometer, via the leaky integrator.
+// "network" — a rupture the Go backend's H3 radar already confirmed from
+//   many independent devices, relayed over /ws/telemetry. Since it's
+//   already confirmed, this bypasses the local physics engine entirely.
+// "test" — the on-screen "Test Alarm" button.
+type AlertSource = "local" | "network" | "test";
+
 /**
  * Web Audio-synthesized emergency siren — a sweeping sawtooth oscillator,
  * no external audio file to load (or fail to load offline).
@@ -209,8 +217,12 @@ function useSiren() {
 export default function LiteDashboardPage() {
   const [permission, setPermission] = useState<Permission>("idle");
   const [alertActive, setAlertActive] = useState(false);
-  const [isTest, setIsTest] = useState(false);
-  const [peakG, setPeakG] = useState(0);
+  const [alertSource, setAlertSource] = useState<AlertSource>("local");
+  // Meaning depends on alertSource: g-force (local sensor units) for
+  // "local"/"test", Richter-like estimated magnitude (internal/detector's
+  // estimateMagnitude, no "g" unit at all) for "network" — never rendered
+  // with the same label, see AlertOverlay.
+  const [peakValue, setPeakValue] = useState(0);
   const [currentG, setCurrentG] = useState(0);
   const [currentEnergy, setCurrentEnergy] = useState(0);
   const [wakeLockEnabled, setWakeLockEnabled] = useState(false);
@@ -279,10 +291,10 @@ export default function LiteDashboardPage() {
   });
 
   const triggerAlert = useCallback(
-    (test: boolean, magnitude: number) => {
+    (source: AlertSource, value: number) => {
       if (alertActiveRef.current) return; // already alerting — don't restart the siren/strobe mid-alert
-      setIsTest(test);
-      setPeakG(magnitude);
+      setAlertSource(source);
+      setPeakValue(value);
       setAlertActive(true);
       siren.start();
     },
@@ -290,9 +302,11 @@ export default function LiteDashboardPage() {
     [siren.start],
   );
 
+  // A single alertActive flag (rather than separate local/network booleans)
+  // means dismissing always clears whichever source triggered it, by
+  // construction — there's no second state to remember to reset.
   const dismissAlert = useCallback(() => {
     setAlertActive(false);
-    setIsTest(false);
     siren.stop();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [siren.stop]);
@@ -362,7 +376,7 @@ export default function LiteDashboardPage() {
         // that hadn't fully leaked away yet would immediately re-trigger
         // the alert the moment the user dismisses it.
         physics.energy = 0;
-        triggerAlert(false, magnitude);
+        triggerAlert("local", magnitude);
       }
     },
     [triggerAlert],
@@ -371,6 +385,30 @@ export default function LiteDashboardPage() {
   useEffect(() => {
     return () => window.removeEventListener("devicemotion", handleMotion);
   }, [handleMotion]);
+
+  // Connects immediately on mount (not gated on `permission`), so the
+  // socket is already live and reconnected well before the user arms —
+  // there's no reason to delay establishing connectivity just because the
+  // motion-sensor permission flow hasn't happened yet.
+  const { connected: networkConnected, latestRupture, ruptureVersion } = useRuptureSocket();
+
+  useEffect(() => {
+    if (!latestRupture) return; // nothing received yet — this only runs for real, ruptureVersion-bumped arrivals below
+    if (!armedRef.current) {
+      // Not armed yet: the siren was never unlocked by a user gesture (see
+      // useSiren's unlock()), so triggerAlert would show the strobe with no
+      // sound — and there's no "Armed — Monitoring" screen yet to
+      // interrupt. A rupture that arrived before arming is also already in
+      // the past by the time the user does arm, so there's nothing correct
+      // to replay after the fact either.
+      return;
+    }
+    // Already confirmed by the backend's coincidence detector (many
+    // independent devices agreeing) — bypasses this device's own local
+    // physics engine entirely rather than re-deriving anything from it.
+    triggerAlert("network", latestRupture.payload.magnitude);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ruptureVersion]);
 
   async function activate() {
     // A real user gesture, right here — unlocks Web Audio for the later
@@ -450,15 +488,16 @@ export default function LiteDashboardPage() {
           <ArmedScreen
             currentG={currentG}
             currentEnergy={currentEnergy}
-            onTest={() => triggerAlert(true, currentG)}
+            onTest={() => triggerAlert("test", currentG)}
             meshEnabled={meshEnabled}
             meshRegion={meshRegion}
             onMeshRegionChange={changeMeshRegion}
+            networkConnected={networkConnected}
           />
         )}
       </div>
 
-      {alertActive && <AlertOverlay isTest={isTest} peakG={peakG} onDismiss={dismissAlert} />}
+      {alertActive && <AlertOverlay source={alertSource} peakValue={peakValue} onDismiss={dismissAlert} />}
     </div>
   );
 }
@@ -499,6 +538,7 @@ function ArmedScreen({
   meshEnabled,
   meshRegion,
   onMeshRegionChange,
+  networkConnected,
 }: {
   currentG: number;
   currentEnergy: number;
@@ -506,13 +546,31 @@ function ArmedScreen({
   meshEnabled: boolean;
   meshRegion: Region;
   onMeshRegionChange: (region: Region) => void;
+  networkConnected: boolean;
 }) {
   const energyPercent = Math.min(100, (currentEnergy / ENERGY_TRIGGER_THRESHOLD) * 100);
   return (
     <main className="mx-auto flex h-full max-w-md flex-col items-center justify-center gap-6 p-6 text-center">
-      <div className="flex items-center gap-2 rounded-full border border-emerald-500/40 bg-emerald-500/10 px-4 py-1.5 text-xs font-semibold uppercase tracking-wide text-emerald-400">
-        <span className="h-2 w-2 animate-pulse rounded-full bg-emerald-400" />
-        Armed — Monitoring
+      <div className="flex flex-wrap items-center justify-center gap-2">
+        <div className="flex items-center gap-2 rounded-full border border-emerald-500/40 bg-emerald-500/10 px-4 py-1.5 text-xs font-semibold uppercase tracking-wide text-emerald-400">
+          <span className="h-2 w-2 animate-pulse rounded-full bg-emerald-400" />
+          Armed — Monitoring
+        </div>
+        <div
+          title={
+            networkConnected
+              ? "Connected — this device will also sound the alarm the instant the network confirms a rupture"
+              : "Reconnecting — network-relayed alerts are unavailable until this reconnects (the local sensor alarm above still works)"
+          }
+          className={`flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold uppercase tracking-wide ${
+            networkConnected
+              ? "border-cyan-500/40 bg-cyan-500/10 text-cyan-400"
+              : "border-amber-500/40 bg-amber-500/10 text-amber-400"
+          }`}
+        >
+          {networkConnected ? <Wifi size={12} /> : <WifiOff size={12} className="animate-pulse" />}
+          {networkConnected ? "Network Relay Live" : "Reconnecting..."}
+        </div>
       </div>
 
       <div className="w-full">
@@ -565,7 +623,17 @@ function ArmedScreen({
   );
 }
 
-function AlertOverlay({ isTest, peakG, onDismiss }: { isTest: boolean; peakG: number; onDismiss: () => void }) {
+function AlertOverlay({
+  source,
+  peakValue,
+  onDismiss,
+}: {
+  source: AlertSource;
+  peakValue: number;
+  onDismiss: () => void;
+}) {
+  const isTest = source === "test";
+  const isNetwork = source === "network";
   return (
     <div className="ne-pulse-strobe-bg fixed inset-0 z-[9999] flex items-center justify-center p-6">
       <div className="w-full max-w-md rounded-2xl border-4 border-red-600 bg-black/90 p-6 text-center shadow-2xl">
@@ -574,14 +642,27 @@ function AlertOverlay({ isTest, peakG, onDismiss }: { isTest: boolean; peakG: nu
             Test Mode — Not A Real Alert
           </div>
         )}
+        {isNetwork && (
+          <div className="mb-3 inline-block rounded-full bg-cyan-500/20 px-3 py-1 text-xs font-bold uppercase tracking-wide text-cyan-400">
+            Confirmed by NE-PULSE Network — Wave Still Approaching
+          </div>
+        )}
         <TriangleAlert size={56} className="mx-auto mb-4 text-red-500" />
         <h1 className="text-3xl font-black uppercase leading-tight tracking-tight text-red-500 sm:text-4xl">
-          Earthquake Detected
+          {isNetwork ? "Network Alert: Incoming Seismic Wave" : "Earthquake Detected"}
         </h1>
         <p className="mt-3 text-xl font-bold uppercase tracking-wide text-white sm:text-2xl">
           Drop, Cover, and Hold On
         </p>
-        <p className="mt-1 text-xs uppercase tracking-wide text-slate-400">Peak reading: {peakG.toFixed(2)}g</p>
+        {/* peakValue's unit depends entirely on source: a local/test alarm's
+            peakValue is this device's own g-force reading; a network
+            alarm's is the backend's Richter-like estimateMagnitude, which
+            is never a "g" value — labeling both the same way would make
+            one of them nonsensical (e.g. "6.20g" implying 6.2 g's of
+            force for what's actually an estimated magnitude ~6.2 tremor). */}
+        <p className="mt-1 text-xs uppercase tracking-wide text-slate-400">
+          {isNetwork ? `Estimated magnitude: ${peakValue.toFixed(1)}` : `Peak reading: ${peakValue.toFixed(2)}g`}
+        </p>
 
         <ul className="mt-5 space-y-2 text-left text-sm text-slate-200">
           <li>• Get under a sturdy desk or table.</li>
