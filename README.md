@@ -12,7 +12,10 @@ magnitude-scaled geofence.
 
 This document describes the system as it actually runs, with direct
 references into the source for every non-obvious claim — not a marketing
-summary of what it's supposed to do.
+summary of what it's supposed to do. For an audit-grade deep dive —
+exact struct/interface definitions, algorithmic complexity proofs, and a
+tracked open-findings inventory with proposed remediations — see
+[`docs/TECHNICAL_MANIFEST.md`](docs/TECHNICAL_MANIFEST.md).
 
 ---
 
