@@ -1,13 +1,14 @@
 # NE-PULSE — Master Technical Manifest
 
-**Scope**: the complete NE-PULSE architecture as of commit `00d3ca7`,
-synthesizing the system's data-flow pipeline, concurrency model, spatial
-indexing strategy, algorithmic complexity bounds, production topology,
-and open technical debt into one canonical source. This document
-supersedes the former `docs/ARCHITECTURE_AUDIT.md` (fully absorbed below,
-now extended with concrete remediation designs for every open finding).
-[`README.md`](../README.md) remains the short, onboarding-oriented front
-door and links here for depth.
+**Scope**: the complete NE-PULSE architecture, synthesizing the system's
+data-flow pipeline, concurrency model, spatial indexing strategy,
+algorithmic complexity bounds, production topology, and open technical
+debt into one canonical source. This document supersedes the former
+`docs/ARCHITECTURE_AUDIT.md` (fully absorbed below). Findings §1–§3 were
+revised after review to correct an unsafe remediation proposal; §4–§5
+were added after review identified two additional structural gaps not
+present in the original pass. [`README.md`](../README.md) remains the
+short, onboarding-oriented front door and links here for depth.
 
 Every claim below is cited against an exact file and, where precision
 matters, exact code — not paraphrase. Where something cannot be verified
@@ -104,15 +105,15 @@ Under backpressure (a full channel), the frame is dropped, counted, and
 returned to `sync.Pool` (`framePool`) — the gRPC caller is never blocked
 waiting for queue capacity.
 
-**Stated precisely, not aspirationally**: Go's channel implementation
-(`runtime.hchan`) is internally guarded by the runtime's own mutex. This
-architecture eliminates **user-level / application-level** mutex
-synchronization — no `sync.Mutex` in this package's own state, and no
-goroutine ever blocks on another goroutine's *application logic*. It
-operates within, not outside of, the Go runtime's own internal
-primitives. It is not "lock-free" in the formal non-blocking-algorithms
-sense (no CAS-loop retry semantics anywhere in this file); that
-distinction should not be elided in any downstream description.
+The engineering property, stated directly rather than as a claim about
+terminology: every piece of mutable state in this type is owned by
+exactly one goroutine for its entire lifetime — `frames` is only ever
+drained by its worker, each `Consumer` is only ever touched by the worker
+it was built for. Ownership, not locking, is what makes concurrent access
+safe here. Coordination between goroutines is entirely through the
+channel (handoff) and atomic counters (observation) — never through a
+shared, lock-guarded structure. This is single-threaded state ownership
+via goroutines, applied architecture-wide, not a single-file idiom.
 
 **The same pattern, independently re-applied**: `internal/detector/radar.go`'s
 `SpatialRadar` uses an identical shape — a buffered `incoming chan
@@ -178,7 +179,27 @@ subdivides ~7 children per resolution level, so edge length scales by
 `√7` per level away from 8.
 
 This split is not documented further here as a strength without
-qualification — see Finding #2 (§4.2) for the corresponding gap.
+qualification — see Finding #2 (§4.2) for the corresponding gap, and
+Finding #4 below for a correctness gap specific to the fallback path.
+
+**Antimeridian discontinuity in the pure-Go fallback (fallback path
+only — does not affect `h3_indexer.go`)**: `math.Floor(lng /
+idx.cellSizeDeg)` performs no wraparound at the ±180° boundary. Numerically
+confirmed: two points a few meters apart straddling the antimeridian —
+`lng = 179.9999` and `lng = -179.9999` — resolve to `lngCell = 43478` and
+`lngCell = -43479` respectively at resolution 8. Packed into the returned
+`uint64`, these are about as numerically distant as two cell keys can be;
+`SpatialRadar`'s `map[uint64]*cellBucket` will never place them in the
+same or an adjacent bucket, so two devices meters apart across that line
+can never contribute to the same coincidence check. Real H3
+(`h3_indexer.go`) does not share this defect — H3 indexes onto an
+icosahedral projection built to handle the whole globe, including the
+antimeridian and poles, correctly. **Current practical impact: none** —
+this deployment's operating region (Uzbekistan, ~56–73°E) is nowhere near
+±180° longitude — but it is a structural correctness gap in the fallback
+specifically, not a theoretical one, and must be fixed before any
+deployment whose coverage area could span the date line. See Finding #5
+(§4) for the proposed remediation.
 
 ### 2.3 Algorithmic Complexity Bounds
 
@@ -222,6 +243,27 @@ under-provisioned relative to real traffic: high insertion volume at a
 busy cell can evict still-in-window readings *by count* before they age
 out *by time* — an availability/false-negative risk to check against real
 expected device density per cell, not merely a performance knob.
+
+**This is not only a capacity-planning concern — it is an unmitigated
+attack surface.** `cellBucket.add` evicts strictly oldest-by-insertion-order
+once at capacity:
+
+```go
+func (b *cellBucket) add(r shockReading, capacity int) {
+	if len(b.readings) >= capacity {
+		copy(b.readings, b.readings[1:])
+		b.readings[len(b.readings)-1] = r
+		return
+	}
+	b.readings = append(b.readings, r)
+}
+```
+
+Eviction is triggered purely by count, with no check on whether the
+evicted reading is still inside the coincidence window. Nothing upstream
+of this bounds how many of a bucket's `BucketCapacity` slots one single
+`DeviceID` can occupy. See Finding #4 (§4) for the concrete exploit path
+and proposed remediation.
 
 ### 2.4 Ingress Clock Handshaking — `internal/ingress/hardware.go`
 
@@ -366,39 +408,72 @@ server receipt time only when `ts` is *omitted*. A supplied timestamp —
 malformed, drifted, or adversarial — passes through unvalidated into the
 coincidence detector's timing window (§2.4).
 
-**Proposed remediation — window-clamping**: reject the implicit trust,
-not just the missing-field case. Treat any supplied timestamp outside a
-bounded skew window from server time exactly like an omitted one — fall
-back to receipt time rather than propagate a value the server has reason
-to distrust:
+**Proposed remediation — reject, do not substitute.** An earlier draft of
+this finding proposed silently clamping an out-of-window `ts` to server
+receipt time — that is wrong, and worth stating why precisely: this is
+not a general-purpose web API, it is the input to a physics engine
+running a 50ms coincidence window. Substituting a fabricated time anchor
+does not make the reading "safe" — it makes it *silently wrong* in
+exactly the dimension the whole detector depends on.
+
+Concretely: during a real rupture, cell congestion is the expected case,
+not the exception — every affected device is transmitting at once. A
+genuine reading that takes 6 seconds to arrive over a congested path is
+not corrupt; its *timestamp is the one truthful thing about it*, and it's
+precisely the datum that lets the radar still place it correctly relative
+to a second device's reading that arrived over a faster route. Overwrite
+that timestamp to receipt time and the two readings — which may be a
+genuine, physically real coincidence — will never align in the 50ms
+window; the rupture goes undetected. Silent substitution doesn't fail
+safe here, it fails *silently and specifically in the case that matters
+most*.
+
+The correct response to an untrustworthy timestamp is to refuse to
+guess. Reject the frame outright, before it ever reaches
+`pool.Submit`/the spatial radar — the same pattern this handler already
+uses for every other integrity violation (`ErrMissingDeviceID`,
+`ErrMissingCoordinates`, `ErrAccelerationOutOfRange`):
 
 ```go
+var ErrTimestampOutOfSkewWindow = errors.New("ingress: supplied timestamp outside acceptable clock-skew window")
+
 const maxHardwareClockSkew = 5 * time.Second
 
-frame.TimestampMs = p.Timestamp
-switch {
-case frame.TimestampMs == 0:
-    frame.TimestampMs = time.Now().UnixMilli()
-case time.Since(time.UnixMilli(frame.TimestampMs)).Abs() > maxHardwareClockSkew:
-    // Supplied but untrustworthy — treat identically to omitted rather
-    // than reject outright, matching the existing fallback semantics
-    // rather than introducing a second, harsher failure mode for
-    // well-meaning devices with merely-drifted clocks.
-    frame.TimestampMs = time.Now().UnixMilli()
+func (p HardwareTelemetryPayload) ToTelemetryFrame() (*ingest.TelemetryFrame, error) {
+	// ... existing DeviceID / coordinate / acceleration checks unchanged ...
+
+	if p.Timestamp != 0 {
+		skew := time.Since(time.UnixMilli(p.Timestamp))
+		if skew.Abs() > maxHardwareClockSkew {
+			return nil, ErrTimestampOutOfSkewWindow
+		}
+	}
+
+	frame := ingest.AcquireFrame()
+	// ...
+	frame.TimestampMs = p.Timestamp
+	if frame.TimestampMs == 0 {
+		frame.TimestampMs = time.Now().UnixMilli() // unchanged: omission still falls back safely
+	}
+	return frame, nil
 }
 ```
 
-`maxHardwareClockSkew` should be sized against real network RTT plus
-expected RTC drift for the target hardware class, not against
-`-radar-coincidence-window` (50ms default) directly — the coincidence
-window governs *cross-device* agreement, not *device-to-server* clock
-tolerance, and conflating the two would make the skew check far too
-strict for any real device on a real network. 5s is a starting proposal,
-not a measured constant. A rejected-vs-silently-corrected policy decision
-(400 the request vs. silently substitute) is a product choice this
-document does not resolve; the substitution shown above is the
-minimum-surprise default consistent with the existing omitted-`ts`
-behavior.
+The handler returns `400 Bad Request` on `ErrTimestampOutOfSkewWindow`,
+identically to its existing error path for every other validation
+failure. The omitted-`ts` fallback is untouched — that path was never the
+problem; it produces an honest, server-authored anchor. Only a *supplied*
+and *implausible* timestamp is now refused rather than laundered into a
+false one.
+
+`maxHardwareClockSkew` should be sized generously against worst-case
+network RTT during real congestion, not against `-radar-coincidence-window`
+(50ms) — conflating "how far can a device's clock be from truth" with
+"how tight must two devices' readings align" would reject legitimate
+delayed-but-honest packets during exactly the high-load event this system
+exists to detect. 5s is a starting proposal, not a measured constant; it
+should be derived from real field data on packet RTT to Render under
+congestion, not guessed.
 
 ### Finding #2 — Compilation Opacity
 
@@ -504,6 +579,135 @@ Net effect: exactly one `WebSocket` per dashboard tab, one call site
 performing the actual `useTelemetrySocket()` invocation in the entire
 codebase, and `useDynamicRupture` becomes a pure function of its inputs —
 easier to unit test than a hook with a hidden network side effect.
+
+### Finding #4 — Noisy-Neighbor Bucket Eviction
+
+**Defect**: no rate limiting anywhere in the request path is keyed by
+`DeviceID` or by spatial cell. What exists (`internal/ratelimit`,
+`limiter.Middleware(mux)` in `cmd/server/main.go`) is keyed by client IP
+— default `-rate-limit-per-second=5`, `-rate-limit-burst=5` — and applies
+uniformly to every HTTP route, including `/api/ingress/hardware`. This is
+real protection against one obvious case (a single device flooding from
+its own IP gets capped at 5 req/s) but does not structurally protect a
+single cell's fixed-capacity bucket, for two independent reasons:
+
+1. **Single compliant device, sustained.** `cellBucket.add` (§2.3)
+   evicts oldest-by-insertion-order once at `BucketCapacity` (default 64),
+   with no regard for whether the evicted entry is still inside the
+   coincidence window. One device transmitting continuously at the
+   *allowed* rate limit (5 req/s) fills a default 64-capacity bucket with
+   its own readings in ~12.8 seconds — evicting any other device's
+   genuine reading that happened to land in that cell earlier, entirely
+   within the IP rate limit, no abuse of that layer required.
+2. **Distributed, multi-IP.** IP-keyed limiting has no concept of "which
+   cell will this reading map to." A set of devices — compromised,
+   miscalibrated, or simply colocated — each individually compliant with
+   the per-IP limit but collectively targeting one geographic cell, is
+   invisible to the existing limiter entirely, since no single IP ever
+   crosses its own threshold.
+
+Both paths converge on the same outcome the eviction-by-count code path
+already permits: a real rupture's genuine coincidence signal in that cell
+gets silently displaced by noise, undetected.
+
+**Proposed remediation — reuse `ratelimit.Limiter`, keyed by `DeviceID`,
+enforced in `internal/ingress/hardware.go`.** `ratelimit.Limiter.Allow(key)`
+already takes an arbitrary string key — its IP-specific behavior lives
+entirely in `Middleware`'s `clientIP(r)` call, not in the limiter itself.
+A second `Limiter` instance, keyed by `payload.DeviceID` instead, requires
+no new machinery — including its existing `Sweep`-based cleanup, which
+already solves the "don't leak memory for a growing set of keys" problem
+this addition would otherwise introduce fresh:
+
+```go
+// cmd/server/main.go — a second limiter, independent of the existing
+// per-IP one, sized to one legitimate device's expected sensor cadence
+// (the Lite dashboard's own client throttles mesh contribution to
+// 1 req/s — MESH_TRANSMIT_THROTTLE_MS in web/app/dashboard/lite/page.tsx
+// — so a comparable per-device ceiling here is consistent with the
+// system's own designed cadence, not an arbitrary new number).
+deviceLimiter := ratelimit.New(2, 4) // 2 req/s, burst 4, per DeviceID
+go deviceLimiter.Run(ctx)
+```
+
+```go
+// internal/ingress/hardware.go's NewHardwareHandler, after decoding the
+// payload and before payload.ToTelemetryFrame():
+if !deviceLimiter.Allow(payload.DeviceID) {
+	http.Error(w, "device rate limit exceeded", http.StatusTooManyRequests)
+	return
+}
+```
+
+This closes case 1 directly (no single device, however rate-limit
+compliant at the IP layer, can out-produce its own per-device budget) and
+meaningfully raises the cost of case 2 (a distributed attack now needs
+many distinct, spoofed-or-real `DeviceID`s, not just many IPs — a
+materially harder attack to mount than the current zero-cost version).
+It does not fully solve a large-scale Sybil attack with many genuine
+device identities; that is a separate, harder problem (e.g. tying
+`DeviceID` to the `X-API-Token` identity when hardware auth is
+configured) out of scope for this specific finding.
+
+### Finding #5 — Antimeridian Breakpoint
+
+**Defect**: `internal/detector/gridcell_indexer.go`'s `CellID` (§2.2)
+performs plain linear division with no wraparound at ±180° longitude.
+Numerically confirmed: `lng = 179.9999` and `lng = -179.9999` — physically
+meters apart — resolve to `lngCell = 43478` and `lngCell = -43479`
+respectively, packed into `uint64` keys with no numerical proximity
+whatsoever. Two devices straddling the date line can never land in the
+same or an adjacent bucket, so a genuine coincidence across that line is
+structurally undetectable. Scoped precisely: this affects only the
+pure-Go fallback; real H3 (`h3_indexer.go`) handles the antimeridian
+correctly by construction (icosahedral projection, not raw lat/lng
+division). Current deployment impact is nil — Uzbekistan's ~56–73°E
+footprint is nowhere near the date line — but this is a structural defect
+in the fallback path, not a hypothetical one, and blocks any future
+deployment whose coverage could span it.
+
+**Proposed remediation — explicit modulo wrapping on the longitude axis**,
+normalizing into `[-180, 180)` before quantizing, and treating the
+wrapped edge cells as numerically adjacent rather than maximally distant:
+
+```go
+func normalizeLng(lng float64) float64 {
+	// Wrap into [-180, 180) — e.g. 180.0 -> -180.0, 190.0 -> -170.0 —
+	// so a point just past the antimeridian in either direction lands in
+	// the same numeric neighborhood as its physical neighbor on the
+	// other side, instead of the opposite end of the int32 range.
+	wrapped := math.Mod(lng+180, 360)
+	if wrapped < 0 {
+		wrapped += 360
+	}
+	return wrapped - 180
+}
+
+func (idx *GridCellIndexer) CellID(lat, lng float64) uint64 {
+	latCell := int32(math.Floor(lat / idx.cellSizeDeg))
+	lngCell := int32(math.Floor(normalizeLng(lng) / idx.cellSizeDeg))
+	return uint64(uint32(latCell))<<32 | uint64(uint32(lngCell))
+}
+```
+
+This alone corrects the *value* of `lngCell` at the boundary, but does
+**not** by itself make `lngCell = maxCell` and `lngCell = minCell`
+numerically adjacent in the packed `uint64` — the underlying discontinuity
+in integer cell-index space at the wrap point still exists after
+normalization; two cells on opposite sides of the (now correctly wrapped)
+boundary still differ by the full width of the longitude range in raw
+`lngCell` terms, not by 1. A complete fix additionally requires
+`SpatialRadar`'s neighbor-cell logic (wherever adjacent-cell lookups
+occur, if they occur — as of this commit, coincidence detection is
+strictly single-cell, so this may currently be moot) to explicitly special-case
+the wraparound boundary, or requires switching the fallback's encoding to
+something wrap-aware by construction rather than patching the symptom.
+Given that complexity, and that real H3 already solves this correctly:
+**the higher-leverage fix, if global deployment is ever planned, is
+guaranteeing a cgo-enabled build (real H3) at deploy time rather than
+hardening the fallback to feature parity** — closing Finding #2
+(Compilation Opacity) first would make this decision visible and
+auditable rather than accidental.
 
 ---
 
