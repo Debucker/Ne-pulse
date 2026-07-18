@@ -6,6 +6,7 @@ import type { LatLngBoundsExpression, Map as LeafletMap } from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { AnimatePresence, motion } from "framer-motion";
 import { Monitor, Play } from "lucide-react";
+import { useDemoRupture } from "./DemoRuptureProvider";
 import RadarSweep from "./RadarSweep";
 
 // Uzbekistan's real bounding box. A fixed center+zoom looked fine on a wide
@@ -82,10 +83,20 @@ function useProjectedPoint(map: LeafletMap, lat: number, lng: number) {
   return point;
 }
 
+// Maps the map overlay's arbitrary 1-5 severity scale onto a plausible
+// display magnitude for the seismograph chart elsewhere on the page — this
+// demo has no real backend rupture behind it, so there's no true magnitude
+// to read; this is just enough range (4.5-7.3) to make severity 5 visibly
+// more dramatic on the chart than severity 1.
+function severityToDemoMagnitude(severity: number): number {
+  return 4.5 + (severity - 1) * 0.7;
+}
+
 function MapOverlays() {
   const map = useMap();
   const [rupture, setRupture] = useState<Rupture | null>(null);
   const [cooldown, setCooldown] = useState(0);
+  const { triggerDemoRupture } = useDemoRupture();
 
   useEffect(() => {
     if (cooldown <= 0) return;
@@ -98,13 +109,15 @@ function MapOverlays() {
 
   function simulate() {
     if (cooldown > 0) return;
+    const severity = Math.ceil(Math.random() * 5);
     setRupture({
       id: Date.now(),
       lat: randomBetween(...RUPTURE_LAT_RANGE),
       lng: randomBetween(...RUPTURE_LNG_RANGE),
-      severity: Math.ceil(Math.random() * 5),
+      severity,
     });
     setCooldown(COOLDOWN_SECONDS);
+    triggerDemoRupture(severityToDemoMagnitude(severity));
   }
 
   return (

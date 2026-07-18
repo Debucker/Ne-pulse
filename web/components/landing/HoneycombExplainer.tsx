@@ -21,22 +21,22 @@ export default function HoneycombExplainer() {
             <Reveal delay={0.1}>
               <Feature
                 icon={<Hexagon size={20} />}
-                title="Virtual honeycomb zones"
-                body="Instead of comparing raw GPS coordinates against each other, we snap every device into one of millions of small hexagonal zones that tile the entire globe — like graph paper for the planet. Two phones in the same hexagon are, by definition, close together."
+                title="Discrete spatial partitioning via Uber H3 indexing"
+                body="Instead of running heavy, non-linear geometric boundary computations against raw GPS coordinates, every reading's lat/lng is indexed instantly into a discrete, hierarchical hexagonal cell key via Uber's H3 library (github.com/uber/h3-go) — with an automatic pure-Go equirectangular-grid fallback when a C toolchain isn't available at build time. Two phones in the same cell are, by definition, close together."
               />
             </Reveal>
             <Reveal delay={0.2}>
               <Feature
                 icon={<Search size={20} />}
-                title="One instant lookup, not a search"
-                body="Asking 'how many devices are in this hexagon right now?' is a single, instant lookup — not a search through every device's coordinates. That's what makes it fast enough to run in real time, at any scale."
+                title="O(1) spatial bucket resolution"
+                body="Routing a new reading to its cell is a single hash-map lookup keyed on its H3 index — never an iterative comparison against every other active device's coordinates, the approach that would otherwise force scan time to grow with total device count. Confirming coincidence within that cell then checks only its own small, fixed-capacity buffer of recent readings, bounded regardless of how many devices are online system-wide."
               />
             </Reveal>
             <Reveal delay={0.3}>
               <Feature
                 icon={<Gauge size={20} />}
-                title="Built for speed from the ground up"
-                body="The whole detection pipeline is written in Go and designed to never block on a slow operation — every incoming reading is handled the moment it arrives."
+                title="Concurrent, lock-free ingestion engine"
+                body="The ingestion pipeline is written in Go: goroutines and channel-based handoff move every reading from the gRPC hot path to background workers with zero application-level mutexes — each worker owns its own consumer state exclusively, coordinating only through a buffered channel and atomic counters, so no incoming reading ever blocks on lock contention."
               />
             </Reveal>
           </div>

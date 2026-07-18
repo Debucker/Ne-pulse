@@ -5,16 +5,23 @@ import HoneycombExplainer from "@/components/landing/HoneycombExplainer";
 import ScrollJourney from "@/components/landing/ScrollJourney";
 import MediaShowcase from "@/components/landing/MediaShowcase";
 import LandingFooter from "@/components/landing/LandingFooter";
+import { DemoRuptureProvider } from "@/components/landing/DemoRuptureProvider";
 
 export default function LandingPage() {
   return (
     <div className="min-h-screen">
       <LandingNav />
       <Hero />
-      <WaveTimeline />
-      <HoneycombExplainer />
-      <ScrollJourney />
-      <MediaShowcase />
+      {/* WaveTimeline's "Simulate a rupture" button and MediaShowcase's
+          seismic trace chart live in separate sections with no shared
+          parent state of their own — this provider is the seam between
+          them (see DemoRuptureProvider.tsx). */}
+      <DemoRuptureProvider>
+        <WaveTimeline />
+        <HoneycombExplainer />
+        <ScrollJourney />
+        <MediaShowcase />
+      </DemoRuptureProvider>
       <LandingFooter />
     </div>
   );

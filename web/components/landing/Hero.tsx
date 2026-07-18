@@ -4,6 +4,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { motion } from "framer-motion";
 import { ArrowRight, Cpu, Smartphone, Radio, ShieldAlert } from "lucide-react";
+import NetworkStatusTicker from "./NetworkStatusTicker";
 import Reveal from "./Reveal";
 
 export default function Hero() {
@@ -34,6 +35,8 @@ export default function Hero() {
           real time and giving cities precious seconds of warning before the
           destructive shaking arrives.
         </p>
+
+        <NetworkStatusTicker />
 
         <div className="mt-10 flex flex-wrap items-center justify-center gap-3">
           <Link

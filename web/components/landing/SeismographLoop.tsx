@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { Radio } from "lucide-react";
+import { FlaskConical, Radio } from "lucide-react";
+import { useDemoRupture } from "./DemoRuptureProvider";
 
 // A calm baseline — first and last point share the same y (50) so the
 // scrolling duplicate-copy trick never shows a seam where the two copies
@@ -36,6 +37,51 @@ function buildLiveTrace(magnitude: number) {
     " 240,50 260,51 280,49 300,50 320,51 340,49 360,50 380,51 400,50"
   );
 }
+
+// A deliberately two-phase trace, physically distinct from buildLiveTrace's
+// single symmetric spike: a small, fast, sharp wiggle first (the P-wave),
+// a quiet gap (P outruns S — that gap *is* the warning window this whole
+// project exists for), then one large, slower oscillation (the S-wave).
+// Static and non-looping on purpose — see the isDemo branch below for why.
+function buildDemoTrace(magnitude: number) {
+  const amp = Math.min(1 + (magnitude - 4) * 0.7, 5);
+  const h = 50;
+  const points: [number, number][] = [
+    [0, h],
+    [30, h + 1],
+    [60, h],
+    [90, h - 1],
+    [120, h],
+    // P-wave: fast, sharp, small amplitude
+    [130, h],
+    [138, h - 5],
+    [146, h + 6],
+    [154, h - 4],
+    [162, h],
+    // The gap between P and S arrival — the actual early-warning window
+    [180, h],
+    // S-wave: slower, far larger oscillation
+    [200, h],
+    [220, h - 20 * amp],
+    [240, h + 32 * amp],
+    [260, h - 38 * amp],
+    [280, h + 24 * amp],
+    [300, h - 11 * amp],
+    [320, h + 5 * amp],
+    [340, h],
+    [365, h + 1],
+    [400, h],
+  ];
+  return points.map(([x, y]) => `${x},${y.toFixed(1)}`).join(" ");
+}
+
+// x-positions (out of the 0-400 viewBox) for the three annotation labels,
+// matched to buildDemoTrace's own layout above.
+const DEMO_ANNOTATIONS = [
+  { label: "[t0: Ingestion Trigger]", x: 60 },
+  { label: "[t1: P-Wave Arrival Matched]", x: 146 },
+  { label: "[t2: S-Wave Peak Attenuation]", x: 260 },
+];
 
 function TracePath({ className, points }: { className?: string; points: string }) {
   return (
@@ -78,6 +124,7 @@ function timeAgo(ms: number) {
 
 export default function SeismographLoop() {
   const [quake, setQuake] = useState<Quake | null>(null);
+  const { demoRupture } = useDemoRupture();
 
   useEffect(() => {
     let cancelled = false;
@@ -117,33 +164,67 @@ export default function SeismographLoop() {
   }, []);
 
   const isLive = !!quake && Date.now() - quake.time < LIVE_WINDOW_MS;
+  const isDemo = demoRupture !== null;
   const trace = isLive && quake ? buildLiveTrace(quake.mag) : BASELINE_POINTS;
 
   return (
     <div className="relative flex h-full w-full flex-col overflow-hidden rounded-xl border border-white/10 bg-slate-950">
       <div className="flex items-center justify-between gap-3 border-b border-white/10 bg-slate-900/60 px-4 py-2.5">
         <span className="flex flex-none items-center gap-1.5 text-xs font-medium text-surface-text">
-          <Radio size={12} className="animate-pulse text-surface-danger" />
+          {isDemo ? (
+            <FlaskConical size={12} className="text-amber-400" />
+          ) : (
+            <Radio size={12} className="animate-pulse text-surface-danger" />
+          )}
           Live Seismic Trace
         </span>
-        <span className="truncate text-[10px] uppercase tracking-wide text-surface-muted">
-          {isLive && quake ? `M${quake.mag.toFixed(1)} · ${quake.place}` : "Channel BHZ · Quiet"}
+        <span className={`truncate text-[10px] uppercase tracking-wide ${isDemo ? "text-amber-400" : "text-surface-muted"}`}>
+          {isDemo && demoRupture
+            ? `SIMULATED · M${demoRupture.magnitude.toFixed(1)} DEMO EVENT`
+            : isLive && quake
+              ? `M${quake.mag.toFixed(1)} · ${quake.place}`
+              : "Channel BHZ · Quiet"}
         </span>
       </div>
 
-      <div className="relative flex-1 overflow-hidden text-surface-accent">
-        <motion.div
-          className="flex h-full w-[200%]"
-          animate={{ x: ["0%", "-50%"] }}
-          transition={{ duration: 6, repeat: Infinity, ease: "linear" }}
-        >
-          <TracePath className="h-full w-1/2" points={trace} />
-          <TracePath className="h-full w-1/2" points={trace} />
-        </motion.div>
-      </div>
+      {isDemo && demoRupture ? (
+        // Static, non-looping render while a demo event is showing — the
+        // marquee-scroll trick below exists to hide the seam between two
+        // duplicated baseline copies, which only matters for a continuously
+        // repeating trace. A one-shot annotated event reads far more clearly
+        // held still, like an actual seismologist's annotated readout,
+        // rather than scrolling out of view mid-explanation.
+        <div className="relative flex-1 text-amber-400">
+          <TracePath className="h-full w-full" points={buildDemoTrace(demoRupture.magnitude)} />
+          {DEMO_ANNOTATIONS.map((a) => (
+            <span
+              key={a.label}
+              className="absolute top-1.5 -translate-x-1/2 whitespace-nowrap rounded bg-slate-950/90 px-1.5 py-0.5 text-[9px] font-medium text-amber-300"
+              style={{ left: `${(a.x / 400) * 100}%` }}
+            >
+              {a.label}
+            </span>
+          ))}
+        </div>
+      ) : (
+        <div className="relative flex-1 overflow-hidden text-surface-accent">
+          <motion.div
+            className="flex h-full w-[200%]"
+            animate={{ x: ["0%", "-50%"] }}
+            transition={{ duration: 6, repeat: Infinity, ease: "linear" }}
+          >
+            <TracePath className="h-full w-1/2" points={trace} />
+            <TracePath className="h-full w-1/2" points={trace} />
+          </motion.div>
+        </div>
+      )}
 
       <div className="border-t border-white/10 bg-slate-900/60 px-4 py-1.5 text-[10px] text-surface-muted">
-        {isLive && quake ? `Real event · USGS · ${timeAgo(quake.time)}` : "No recent seismic activity nearby"}
+        {isDemo
+          ? "Simulated demo waveform — not a real seismic event"
+          : isLive && quake
+            ? `Real event · USGS · ${timeAgo(quake.time)}`
+            : "No recent seismic activity nearby"}
       </div>
     </div>
   );
