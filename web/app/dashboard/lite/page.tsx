@@ -17,7 +17,7 @@ import { MapPin, Moon, Radio, ShieldCheck, Siren, Sun, TriangleAlert, Wifi, Wifi
 import DashboardNav from "@/components/dashboard/DashboardNav";
 import HomeLocationSelect from "@/components/dashboard/HomeLocationSelect";
 import { HARDWARE_API_TOKEN, HARDWARE_INGRESS_URL } from "@/lib/config";
-import { haversineKm } from "@/lib/geo";
+import { haversineKm, maxThreatRadiusKm } from "@/lib/geo";
 import { useRuptureSocket } from "@/lib/useRuptureSocket";
 import { useWakeLock } from "@/lib/useWakeLock";
 import { DEFAULT_HOME_REGION, UZBEKISTAN_REGIONS, type Region } from "@/lib/uzbekistanRegions";
@@ -85,15 +85,9 @@ const MESH_TRANSMIT_THROTTLE_MS = 1000;
 // one next door. distanceKm is checked against a magnitude-scaled threat
 // radius before a network alert is ever allowed to fire.
 const S_WAVE_KM_PER_SEC = 3.5; // matches useDynamicRupture.ts's same constant
-
-// Calibrated so minor tremors stay tightly localized while severe events
-// scale realistically, and even the backend's actual magnitude ceiling
-// (internal/detector/radar.go's estimateMagnitude clamps to 8.5) still
-// resolves to a bounded ~1,200km radius rather than leaking across the
-// entire globe: M4.0 -> ~25km, M7.0 -> ~330km, M8.5 -> ~1,200km.
-function maxThreatRadiusKm(magnitude: number): number {
-  return Math.exp(0.86 * magnitude - 0.22);
-}
+// maxThreatRadiusKm itself now lives in lib/geo.ts, shared with the main
+// dashboard's Evaluation Sandbox telemetry log so both surfaces always
+// agree on the exact same threat radius for a given magnitude.
 
 function getOrCreateDeviceId(): string {
   const existing = localStorage.getItem(DEVICE_ID_STORAGE_KEY);

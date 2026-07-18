@@ -3,6 +3,8 @@
 // administrative center. Mirrors internal/solver/cities.go on the Go side
 // — keep the two lists in sync if either changes.
 
+import { haversineKm } from "./geo";
+
 export interface Region {
   name: string;
   lat: number;
@@ -27,3 +29,19 @@ export const UZBEKISTAN_REGIONS: Region[] = [
 ];
 
 export const DEFAULT_HOME_REGION = UZBEKISTAN_REGIONS[0];
+
+/**
+ * The one region geographically farthest from `home`, by Haversine
+ * distance. Used by the dashboard's "distant, filtered" demo simulation to
+ * deterministically land a low-magnitude event outside the geofence
+ * threat radius regardless of which region is currently selected as
+ * Home Location, rather than leaving it to a random epicenter that would
+ * only *usually* land far enough away.
+ */
+export function farthestRegionFrom(home: Region): Region {
+  return UZBEKISTAN_REGIONS.reduce((farthest, candidate) => {
+    const dCandidate = haversineKm(home.lat, home.lng, candidate.lat, candidate.lng);
+    const dFarthest = haversineKm(home.lat, home.lng, farthest.lat, farthest.lng);
+    return dCandidate > dFarthest ? candidate : farthest;
+  }, UZBEKISTAN_REGIONS[0]);
+}

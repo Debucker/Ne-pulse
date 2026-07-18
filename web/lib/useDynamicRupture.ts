@@ -45,7 +45,7 @@ export interface DynamicRuptureState {
   regionWarnings: RegionWarning[];
   triggering: boolean;
   error: string | null;
-  trigger: (lat?: number, lng?: number) => Promise<void>;
+  trigger: (lat?: number, lng?: number, magnitude?: number) => Promise<void>;
   clear: () => void;
 }
 
@@ -90,16 +90,27 @@ export function useDynamicRupture(homeLocation: Region): DynamicRuptureState {
     return () => clearInterval(interval);
   }, [rupture]);
 
-  const trigger = useCallback(async (lat?: number, lng?: number) => {
+  const trigger = useCallback(async (lat?: number, lng?: number, magnitude?: number) => {
     setTriggering(true);
     setError(null);
     try {
-      const hasExplicitPoint = lat !== undefined && lng !== undefined;
+      // Each field is included independently -- the backend
+      // (control.SimulateRuptureHandler) already treats a partial body as
+      // "override just what's present, randomize the rest," so an explicit
+      // magnitude with no coordinates (or vice versa) works correctly
+      // without this hook needing to invent the missing half itself.
+      const body: { lat?: number; lng?: number; magnitude?: number } = {};
+      if (lat !== undefined && lng !== undefined) {
+        body.lat = lat;
+        body.lng = lng;
+      }
+      if (magnitude !== undefined) {
+        body.magnitude = magnitude;
+      }
+      const hasBody = Object.keys(body).length > 0;
       const res = await fetch(SIMULATE_RUPTURE_URL, {
         method: "POST",
-        ...(hasExplicitPoint
-          ? { headers: { "Content-Type": "application/json" }, body: JSON.stringify({ lat, lng }) }
-          : {}),
+        ...(hasBody ? { headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) } : {}),
       });
       if (!res.ok) {
         throw new Error(`server responded ${res.status}`);
