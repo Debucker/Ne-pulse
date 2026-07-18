@@ -86,19 +86,13 @@ const MESH_TRANSMIT_THROTTLE_MS = 1000;
 // radius before a network alert is ever allowed to fire.
 const S_WAVE_KM_PER_SEC = 3.5; // matches useDynamicRupture.ts's same constant
 
-// NOTE ON THE WORKED EXAMPLES THIS FORMULA WAS SPECIFIED WITH: evaluated
-// exactly as given, this returns ~67km at M4.0 and ~3294km at M7.0 -- not
-// the ~25km / ~330km called out alongside it (a ~10x gap at the high end).
-// At the backend's actual magnitude ceiling (internal/detector/radar.go's
-// estimateMagnitude clamps to 8.5), it evaluates to ~23,200km -- farther
-// than any two points on Earth can ever be from each other (~20,015km, half
-// the equatorial circumference) -- meaning geofencing would never filter
-// out a maximum-magnitude event no matter where on the globe it happened.
-// Implemented exactly as specified; the constants likely need
-// recalibrating against the worked examples if ~25km/~330km was the
-// intended behavior.
+// Calibrated so minor tremors stay tightly localized while severe events
+// scale realistically, and even the backend's actual magnitude ceiling
+// (internal/detector/radar.go's estimateMagnitude clamps to 8.5) still
+// resolves to a bounded ~1,200km radius rather than leaking across the
+// entire globe: M4.0 -> ~25km, M7.0 -> ~330km, M8.5 -> ~1,200km.
 function maxThreatRadiusKm(magnitude: number): number {
-  return Math.exp(1.3 * magnitude - 1.0);
+  return Math.exp(0.86 * magnitude - 0.22);
 }
 
 function getOrCreateDeviceId(): string {
