@@ -550,7 +550,7 @@ const en = {
   },
   research: {
     optional: "optional",
-    nightHow: "For the night: plug in the charger, lay the phone flat, tap Dim screen and leave it. If it is moved or put in a pocket, it simply pauses; nothing is recorded while it moves.",
+    nightHow: "For the night: plug in the charger, lay the phone flat, tap Dim screen and leave it. If it is moved or put in a pocket, it simply pauses; nothing is recorded while it moves. To keep it cool: take off a thick case, keep it on a hard surface away from pillows and sunlight, and use Dim screen.",
     lying: "Lying on",
     change: "change",
     tgStartFirst: "Tap Start first; then you can connect Telegram to this phone.",
@@ -1160,7 +1160,7 @@ const ru: typeof en = {
   },
   research: {
     optional: "необязательно",
-    nightHow: "На ночь: поставьте на зарядку, положите телефон ровно, нажмите «Затемнить экран» и оставьте. Если телефон взять в руки или положить в карман, он просто приостановится: пока он движется, ничего не записывается.",
+    nightHow: "На ночь: поставьте на зарядку, положите телефон ровно, нажмите «Затемнить экран» и оставьте. Если телефон взять в руки или положить в карман, он просто приостановится: пока он движется, ничего не записывается. Чтобы телефон не грелся: снимите толстый чехол, кладите на твёрдую поверхность подальше от подушек и солнца, используйте «Затемнить экран».",
     lying: "Лежит на",
     change: "изменить",
     tgStartFirst: "Сначала нажмите «Старт», затем можно подключить Telegram к этому телефону.",
