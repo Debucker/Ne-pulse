@@ -117,7 +117,15 @@ export function looksLikeComputer(): boolean {
   return navigator.maxTouchPoints < 1;
 }
 
-/** Must run inside a user gesture on iOS. */
+/** iPhone/iPad (iPadOS reports itself as a Mac with touch). */
+export function isIOS(): boolean {
+  if (typeof navigator === "undefined") return false;
+  return /iPhone|iPad|iPod/.test(navigator.userAgent) || (/Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1);
+}
+
+/** Must run inside a user gesture on iOS. On Android a refusal from
+ *  requestPermission (some Chromium browsers now have it) is not final:
+ *  the caller should still check whether readings arrive. */
 export async function requestMotionPermission(): Promise<"granted" | "denied" | "unsupported"> {
   if (typeof window === "undefined" || !("DeviceMotionEvent" in window)) return "unsupported";
   const DME = window.DeviceMotionEvent as unknown as { requestPermission?: () => Promise<"granted" | "denied"> };

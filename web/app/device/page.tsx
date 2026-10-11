@@ -8,7 +8,7 @@ import Link from "next/link";
 import dynamic from "next/dynamic";
 import { useEffect, useState } from "react";
 import { ChevronDown, Moon, Play, Square } from "lucide-react";
-import { deleteDevice, fetchMe, parsePlacement, requestMotionPermission, setPlacement, storage, type Placement, type SensorClient, type SensorState } from "@/lib/sensor/client";
+import { deleteDevice, fetchMe, isIOS, parsePlacement, requestMotionPermission, setPlacement, storage, type Placement, type SensorClient, type SensorState } from "@/lib/sensor/client";
 import { currentClient, startStreaming, stopStreaming } from "@/lib/sensor/session";
 import { roman } from "@/lib/api";
 import { mmiKey, useDuration } from "@/lib/format";
@@ -175,7 +175,7 @@ export default function Device() {
               onClick={async () => {
                 // iPhone asks again after Safari restarts; must be inside the tap.
                 const perm = await requestMotionPermission();
-                if (perm === "denied") return setMsg(t("join.errDenied"));
+                if (perm === "denied" && isIOS()) return setMsg(t("join.errDenied"));
                 const c = startStreaming();
                 if (!c) window.location.href = "/join";
                 else setClient(c);

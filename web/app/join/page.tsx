@@ -6,7 +6,7 @@ import { Check } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { LOC_GRID_KM } from "@/lib/config";
-import { enroll, inAppBrowser, looksLikeComputer, probeMotion, requestMotionPermission, storage, checkCohort, setCohort, setPlacement, setCredit, inviteRef, fetchContributors, type Placement } from "@/lib/sensor/client";
+import { enroll, inAppBrowser, looksLikeComputer, isIOS, probeMotion, requestMotionPermission, storage, checkCohort, setCohort, setPlacement, setCredit, inviteRef, fetchContributors, type Placement } from "@/lib/sensor/client";
 import { PlacementPicker, placementDone } from "@/components/device/ResearchPanel";
 import { Grid, type Cell } from "@/lib/sensor/grid";
 import { startStreaming } from "@/lib/sensor/session";
@@ -107,12 +107,11 @@ export default function Join() {
       // Must be the first await inside the tap (iOS requires a user gesture).
       const perm = await requestMotionPermission();
       if (perm === "unsupported") throw new Error(t("join.errUnsupported"));
-      if (perm === "denied")
-        throw new Error(t("join.errDenied"));
+      if (perm === "denied" && isIOS()) throw new Error(t("join.errDenied"));
       // Make sure real readings arrive before registering anything: laptops,
       // computers and some in-app browsers give no motion data at all.
       if (!(await probeMotion())) {
-        throw new Error(inAppBrowser() ? t("join.errInApp") : looksLikeComputer() ? t("join.errComputer") : t("join.errNoData"));
+        throw new Error(inAppBrowser() ? t("join.errInApp") : looksLikeComputer() ? t("join.errComputer") : perm === "denied" ? t("join.errDeniedAndroid") : t("join.errNoData"));
       }
       if (!cell) throw new Error(t("join.errArea"));
       storage.setLocation({ grid: LOC_GRID_KM, row: cell.row, col: cell.col, source: locSource });
