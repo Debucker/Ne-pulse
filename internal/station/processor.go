@@ -109,10 +109,16 @@ type Output struct {
 
 type ring struct{ b []float32 }
 
-func newRing(n int) ring                 { return ring{b: make([]float32, n)} }
-func (r ring) set(k int64, v float64)    { r.b[int(k%int64(len(r.b)))] = float32(v) }
-func (r ring) get(k int64) float64       { return float64(r.b[int(k%int64(len(r.b)))]) }
-func (r ring) span(a, b int64) []float64 { out := make([]float64, 0, b-a); for k := a; k < b; k++ { out = append(out, r.get(k)) }; return out }
+func newRing(n int) ring              { return ring{b: make([]float32, n)} }
+func (r ring) set(k int64, v float64) { r.b[int(k%int64(len(r.b)))] = float32(v) }
+func (r ring) get(k int64) float64    { return float64(r.b[int(k%int64(len(r.b)))]) }
+func (r ring) span(a, b int64) []float64 {
+	out := make([]float64, 0, b-a)
+	for k := a; k < b; k++ {
+		out = append(out, r.get(k))
+	}
+	return out
+}
 
 type secRec struct {
 	g         [3]float64
@@ -169,6 +175,8 @@ type Processor struct {
 	noise     []float64
 	noiseI    int
 	stillFrom float64
+	handledAt float64    // when a listening phone was last picked up; -1 after a fresh start
+	quietG    [3]float64 // gravity direction while it was last listening
 	state     State
 	lastStat  float64
 	lastState State
@@ -202,6 +210,7 @@ func New(cfg Config) *Processor {
 	p.noise = make([]float64, 0, int(cfg.NoiseWindowSec))
 	p.state = StateWarmup
 	p.stillFrom = -1
+	p.handledAt = -1
 	p.lastFF, p.lastClip = -1e18, -1e18
 	return p
 }
@@ -376,6 +385,7 @@ func (p *Processor) startSegment(k int64, x [3]float64) {
 	p.secE, p.secN = 0, 0
 	p.secHist = p.secHist[:0]
 	p.stillFrom = -1
+	p.handledAt = -1
 	p.tr = nil
 	p.setState(StateWarmup, p.tOf(k))
 }
@@ -428,6 +438,9 @@ func (p *Processor) onSecond(t float64) {
 		p.stillFrom = -1
 	}
 
+	if p.state == StateQuiet && still {
+		p.quietG = g
+	}
 	if p.state == StateQuiet {
 		// Only undisturbed, untriggered seconds define the noise floor.
 		if cap(p.noise) > 0 {
@@ -444,11 +457,23 @@ func (p *Processor) onSecond(t float64) {
 	}
 	if p.state == StateWarmup || p.state == StateDisturbed {
 		rate := p.res.Stats().InputRateHz
-		if still && t-p.stillFrom >= p.cfg.SettleSec && rate >= p.cfg.MinInputRateHz {
+		settle := p.cfg.SettleSec
+		if p.state == StateDisturbed && p.handledAt >= 0 && p.stillFrom >= 0 &&
+			p.stillFrom-p.handledAt <= p.cfg.ResumeMaxSec && len(p.noise) >= 30 && p.cfg.ResumeSettleSec > 0 &&
+			angleDeg(p.quietG, g) <= p.cfg.ResumeMaxTiltDeg {
+			// Briefly handled and back in the same position (a tap, a
+			// scroll): keep the known noise floor. A phone put down at a
+			// new angle is a new placement and settles from scratch.
+			settle = p.cfg.ResumeSettleSec
+		}
+		if still && t-p.stillFrom >= settle && rate >= p.cfg.MinInputRateHz {
 			// Seed STA/LTA with the settled background so sensitivity is
 			// immediate rather than minutes after handling energy decays.
 			n := int64(10 * p.fs)
 			from := p.k - n
+			if sf := int64(math.Round(p.stillFrom * p.fs)); from < sf {
+				from = sf // only the still part, not the handling
+			}
 			if from < p.segStart {
 				from = p.segStart
 			}
@@ -472,6 +497,9 @@ func (p *Processor) onSecond(t float64) {
 func (p *Processor) setState(s State, t float64) {
 	if p.state == s {
 		return
+	}
+	if s == StateDisturbed && (p.state == StateQuiet || p.state == StateTriggered) {
+		p.handledAt = t
 	}
 	p.state = s
 	st := p.Status()

@@ -69,6 +69,9 @@ export default function NetworkPage() {
           {view === "field" ? (
             <div className="glass relative h-[min(64vh,580px)] min-h-[360px] overflow-hidden">
               <SeismicField cells={snapshot?.cells ?? []} event={field.event} age={field.age} noise={snapshot?.trace?.at(-1)?.p50 ?? 1} className="absolute inset-0" zoom={0.9} />
+              {st && !(snapshot?.cells ?? []).length && (
+                <div className="mono pointer-events-none absolute inset-x-0 bottom-6 text-center text-[11px] text-ink-3">{t("net.waiting", { k: st.kAnon ?? 3 })}</div>
+              )}
               {field.event && (
                 <a href={`/event?id=${encodeURIComponent(field.event.id)}`} className="hud mono absolute left-3 top-3 px-3 py-1.5 text-[11px] text-ink-2">
                   {field.mode === "live" ? t("hero.liveEvent") : t("hero.replay")} · {field.event.id}
@@ -77,7 +80,7 @@ export default function NetworkPage() {
             </div>
           ) : view === "graph" ? (
             <div className="glass overflow-hidden">
-              <NetworkGraph cells={snapshot?.cells ?? []} events={events} height="min(62vh, 560px)" label={t("net.server")} emptyText={t("net.waiting")} />
+              <NetworkGraph cells={snapshot?.cells ?? []} events={events} height="min(62vh, 560px)" label={t("net.server")} emptyText={t("net.waiting", { k: st?.kAnon ?? 3 })} />
             </div>
           ) : (
             <Map

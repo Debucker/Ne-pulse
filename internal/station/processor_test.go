@@ -345,3 +345,27 @@ func TestGapResetsAndReportsTruncation(t *testing.T) {
 		t.Fatalf("gap not counted")
 	}
 }
+
+// A tap or a scroll on a phone lying on the table must not cost a full
+// re-settle: it resumes listening once it has been still for ResumeSettleSec.
+func TestBriefTouchResumesQuickly(t *testing.T) {
+	// (Whether one phone calls this slow lift seismic is the classifier's
+	// business; the network needs several independent areas anyway.)
+	r := simulate(12, sim.TypicalPhone(0), []sim.Source{sim.Pickup{T: t0 + 100, Dur: 3, TiltDeg: 2.5, HandAccel: 2}}, 160)
+	off, back := -1.0, -1.0
+	for _, s := range r.status {
+		if s.T > t0+100 && !s.Eligible && off < 0 {
+			off = s.T - t0
+		}
+		if off > 0 && s.T-t0 > off && s.Eligible {
+			back = s.T - t0
+			break
+		}
+	}
+	if off < 0 {
+		t.Fatal("touch did not pause listening")
+	}
+	if back < 0 || back > 100+3+10+6 {
+		t.Fatalf("listening resumed at %.1f s, want within ~19 s of the touch", back)
+	}
+}

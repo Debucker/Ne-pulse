@@ -33,21 +33,21 @@ type Config struct {
 	GravityCutHz float64
 
 	// STA/LTA trigger.
-	StaSec, LtaSec   float64
-	TriggerRatio     float64
-	DetriggerRatio   float64
-	MinTriggerAmp    float64 // absolute floor on trigger amplitude, m/s^2
-	QuantFactor      float64 // trigger amplitude must also exceed QuantFactor x measured resolution
+	StaSec, LtaSec float64
+	TriggerRatio   float64
+	DetriggerRatio float64
+	MinTriggerAmp  float64 // absolute floor on trigger amplitude, m/s^2
+	QuantFactor    float64 // trigger amplitude must also exceed QuantFactor x measured resolution
 	// AssumedResolution is used until a nonzero step has been observed: a
 	// perfectly still phone behind a coarsening browser outputs constant
 	// values, so its resolution is unobservable and must be assumed coarse.
 	AssumedResolution float64
-	PickSigmaSec     float64 // 1-sigma onset uncertainty of the AIC pick
-	EvalDelaySec     float64 // features are computed this long after the trigger
-	MaxTriggerSec    float64 // a trigger is force-closed after this long
-	AICPreSec        float64 // AIC search window before the trigger
-	PreWindowSec     float64 // pre-event noise window
-	EndSettleSec     float64 // after detrigger, wait this long before measuring final tilt
+	PickSigmaSec      float64 // 1-sigma onset uncertainty of the AIC pick
+	EvalDelaySec      float64 // features are computed this long after the trigger
+	MaxTriggerSec     float64 // a trigger is force-closed after this long
+	AICPreSec         float64 // AIC search window before the trigger
+	PreWindowSec      float64 // pre-event noise window
+	EndSettleSec      float64 // after detrigger, wait this long before measuring final tilt
 
 	// Stationarity: a device is "still" when its gravity direction has
 	// varied by less than StillMaxTiltDeg over the last StillWindowSec, and
@@ -59,7 +59,15 @@ type Config struct {
 	// whose mean orientation is constant and so invisible to the tilt test.
 	StillMaxRMS float64
 	SettleSec   float64
-	NoiseWindowSec  float64
+	// A phone that was already listening and is only picked up briefly (a
+	// tap, a scroll, a glance at the screen) keeps its noise floor: if the
+	// handling lasted at most ResumeMaxSec, it is eligible again after
+	// ResumeSettleSec of stillness instead of SettleSec, provided it lies
+	// within ResumeMaxTiltDeg of its earlier position.
+	ResumeSettleSec  float64
+	ResumeMaxSec     float64
+	ResumeMaxTiltDeg float64
+	NoiseWindowSec   float64
 
 	// Rejection gates (see Classify).
 	FreefallFrac        float64 // |a| below this fraction of g counts as free fall
@@ -90,25 +98,28 @@ func DefaultConfig() Config {
 
 		GravityCutHz: 0.1,
 
-		StaSec:         1,
-		LtaSec:         30,
-		TriggerRatio:   4,
-		DetriggerRatio: 1.5,
-		MinTriggerAmp:  0.02,
-		QuantFactor:    2,
+		StaSec:            1,
+		LtaSec:            30,
+		TriggerRatio:      4,
+		DetriggerRatio:    1.5,
+		MinTriggerAmp:     0.02,
+		QuantFactor:       2,
 		AssumedResolution: 0.1,
-		PickSigmaSec:   0.2,
-		EvalDelaySec:   2.56,
-		MaxTriggerSec:  60,
-		AICPreSec:      3,
-		PreWindowSec:   5,
-		EndSettleSec:   4,
+		PickSigmaSec:      0.2,
+		EvalDelaySec:      2.56,
+		MaxTriggerSec:     60,
+		AICPreSec:         3,
+		PreWindowSec:      5,
+		EndSettleSec:      4,
 
-		StillWindowSec:  10,
-		StillMaxTiltDeg: 1.0,
-		StillMaxRMS:     0.15,
-		SettleSec:       30,
-		NoiseWindowSec:  300,
+		StillWindowSec:   10,
+		StillMaxTiltDeg:  1.0,
+		StillMaxRMS:      0.15,
+		SettleSec:        30,
+		ResumeSettleSec:  10,
+		ResumeMaxSec:     120,
+		ResumeMaxTiltDeg: 3,
+		NoiseWindowSec:   300,
 
 		FreefallFrac:        0.3,
 		FreefallMinSec:      0.06,
