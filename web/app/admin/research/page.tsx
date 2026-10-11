@@ -294,7 +294,7 @@ export default function ResearchAdmin() {
           </div>
           <p className="mt-4 max-w-[80ch] text-xs leading-relaxed text-ink-3">
             Raw recordings are on the server under recordings/{data.cohort || cohort}/&lt;date&gt;/&lt;phone&gt;_&lt;hour&gt;.csv.gz (UTC hours, ~60 rows per second: time_utc_ms, x, y, z in m/s²) and &lt;phone&gt;_labels.csv (placement and labels). The phone column above
-            is the same name. Flags: too-clean = quieter than any real phone sensor; perfect-timing = no timing jitter (scripts); not-a-phone; low-rate. Leave flagged rows out of the analysis unless you know why they look odd.
+            is the same name. Flags: too-clean = quieter than any real phone sensor; not-a-phone; low-rate. Leave flagged rows out of the analysis unless you know why they look odd.
           </p>
         </>
       )}

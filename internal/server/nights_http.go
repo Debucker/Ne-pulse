@@ -41,14 +41,12 @@ func (s *Server) NightCode(device, night string) string {
 }
 
 // nightFlags marks device-nights that do not look like a real phone lying
-// still (for the organiser to check before paying).
+// still, so they can be left out of the analysis. (Timing regularity is not
+// a test: iPhones deliver readings at almost exactly even intervals.)
 func nightFlags(n store.Night) []string {
 	var f []string
 	if n.NoiseMin > 0 && n.NoiseMin < 0.0003 {
 		f = append(f, "too-clean") // below any real phone sensor's noise floor
-	}
-	if n.JitterMS < 0.05 && n.RateHz > 0 {
-		f = append(f, "perfect-timing") // real browsers jitter; scripts often don't
 	}
 	if n.Platform != "ios" && n.Platform != "android" {
 		f = append(f, "not-a-phone:"+n.Platform)
