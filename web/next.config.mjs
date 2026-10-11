@@ -46,6 +46,12 @@ const nextConfig = {
       { source: "/sw.js", headers: [{ key: "Cache-Control", value: "public, max-age=0, must-revalidate" }] },
     ];
   },
+  async rewrites() {
+    // A site deployed from git has no /backend.json of its own; it reads the
+    // live tunnel list that the night supervisor publishes elsewhere.
+    const feed = process.env.NEXT_PUBLIC_BACKEND_FEED;
+    return feed ? [{ source: "/backend.json", destination: feed }] : [];
+  },
   async redirects() {
     // Old routes from the previous site.
     return [
