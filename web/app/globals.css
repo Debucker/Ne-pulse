@@ -2,180 +2,383 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Observatory instrument: slate ground, paper-white type, one amber trace
+   colour. Level colours are semantic and separate from the accent. */
+:root {
+  /* Obsidian ground, electric cyan for the instrument and data, high-energy
+     orange for shaking. Level colours stay semantic. */
+  --ground: #05080b;
+  --panel: #0a1015;
+  --raised: #0f171d;
+  --rule: #18232b;
+  --rule-strong: #25343e;
+  --ink: #eaf1f4;
+  --ink-2: #a9b8c0;
+  --ink-3: #6d808b;
+  --cyan: #38e1ff;
+  --hot: #ff7a2f;
+  --trace: #38e1ff;
+  --trace-dim: #1f7f93;
+  --candidate: #f2c14e;
+  --corroborated: #ff9b3d;
+  --confirmed: #ff4d3a;
+  --ok: #4fd18b;
+  --warn: #f2c14e;
+  --bad: #ff5a4a;
+  color-scheme: dark;
+  --ground-rgb: 5 8 11;
+  --panel-rgb: 10 16 21;
+  --raised-rgb: 15 23 29;
+  --rule-rgb: 24 35 43;
+  --rule-strong-rgb: 37 52 62;
+  --ink-rgb: 234 241 244;
+  --ink-2-rgb: 169 184 192;
+  --ink-3-rgb: 109 128 139;
+  --cyan-rgb: 56 225 255;
+  --hot-rgb: 255 122 47;
+  --trace-rgb: 56 225 255;
+  --trace-dim-rgb: 31 127 147;
+  --candidate-rgb: 242 193 78;
+  --corroborated-rgb: 255 155 61;
+  --confirmed-rgb: 255 77 58;
+  --ok-rgb: 79 209 139;
+  --warn-rgb: 242 193 78;
+  --bad-rgb: 255 90 74;
+}
+
 html {
-  scroll-behavior: smooth;
+  background: var(--ground);
+  color: var(--ink);
+  -webkit-text-size-adjust: 100%;
 }
 
 body {
-  background-color: #020617;
-  background-image:
-    linear-gradient(to right, rgba(255, 255, 255, 0.035) 1px, transparent 1px),
-    linear-gradient(to bottom, rgba(255, 255, 255, 0.035) 1px, transparent 1px);
-  background-size: 48px 48px;
+  background: var(--ground);
+  color: var(--ink);
+  font-family: var(--font-body), ui-sans-serif, system-ui, sans-serif;
+  font-size: 15px;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1,
+h2,
+h3 {
+  font-family: var(--font-display), var(--font-display-cyr), var(--font-body), sans-serif;
+  text-wrap: balance;
+  letter-spacing: -0.01em;
+}
+
+::selection {
+  background: var(--trace);
+  color: #11100c;
+}
+
+:focus-visible {
+  outline: 2px solid var(--trace);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+.mono {
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-variant-numeric: tabular-nums;
+}
+
+.label {
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+.prose-np p + p {
+  margin-top: 0.9em;
+}
+.prose-np p,
+.prose-np li {
+  color: var(--ink-2);
+  max-width: 68ch;
+}
+.prose-np h2 {
+  font-size: 1.35rem;
+  margin: 2.2em 0 0.6em;
+  color: var(--ink);
+}
+.prose-np h3 {
+  font-size: 1.05rem;
+  margin: 1.6em 0 0.4em;
+  color: var(--ink);
+}
+.prose-np ul {
+  list-style: none;
+  padding: 0;
+  display: grid;
+  gap: 0.45em;
+  margin-top: 0.7em;
+}
+.prose-np li {
+  padding-left: 1.1em;
+  position: relative;
+}
+.prose-np li::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0.72em;
+  width: 0.5em;
+  height: 1px;
+  background: var(--trace-dim);
+}
+.prose-np code,
+.eq {
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: 0.9em;
+  color: var(--ink);
+}
+.eq {
+  display: block;
+  background: var(--panel);
+  border: 1px solid var(--rule);
+  border-left: 2px solid var(--trace-dim);
+  padding: 0.8em 1em;
+  margin: 0.9em 0;
+  overflow-x: auto;
+  white-space: pre;
+  max-width: 100%;
+}
+.prose-np a {
+  color: var(--trace);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  min-height: 44px;
+  padding: 0 1.2rem;
+  border-radius: 999px;
+  font-weight: 600;
+  font-size: 0.95rem;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+.btn-primary {
+  background: var(--cyan);
+  color: #031116;
+  box-shadow: 0 0 0 1px rgba(56, 225, 255, 0.3), 0 8px 30px -8px rgba(56, 225, 255, 0.55);
+}
+.btn-primary:hover {
+  background: #7aeeff;
+}
+.btn-primary:disabled {
+  background: var(--trace-dim);
+  color: #2a2113;
+  cursor: not-allowed;
+}
+.btn-ghost {
+  border: 1px solid var(--rule-strong);
+  color: var(--ink);
+  background: rgba(10, 16, 21, 0.55);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+.btn-ghost:hover {
+  border-color: var(--ink-3);
+  background: var(--raised);
+}
+.btn-danger {
+  border: 1px solid #5a2a24;
+  color: var(--bad);
+}
+.btn-danger:hover {
+  background: #2a1512;
+}
+
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--rule);
 }
 
 .leaflet-container {
-  background: #020617 !important;
-  font-family: inherit;
+  background: var(--ground) !important;
+  font-family: var(--font-body), sans-serif;
+}
+.np-base {
+  filter: brightness(0.62) contrast(1.05) saturate(0.8);
+}
+.leaflet-control-attribution {
+  background: rgba(11, 16, 20, 0.8) !important;
+  color: var(--ink-3) !important;
+  font-size: 10px !important;
+}
+.leaflet-control-attribution a {
+  color: var(--ink-2) !important;
+}
+.leaflet-bar a {
+  background: var(--panel) !important;
+  color: var(--ink) !important;
+  border-color: var(--rule) !important;
+}
+.leaflet-tooltip.np-tip {
+  background: var(--raised);
+  color: var(--ink);
+  border: 1px solid var(--rule-strong);
+  border-radius: 2px;
+  box-shadow: none;
+  font-family: var(--font-mono), monospace;
+  font-size: 11px;
+}
+.leaflet-tooltip.np-tip::before {
+  display: none;
 }
 
-/* Leaflet's default zoom control buttons (26x26px) fall well short of the
-   ~44px touch-target guideline. Enlarge them only below the app's own `lg`
-   breakpoint (1024px, matching the dashboards' mobile/tablet full-screen-map
-   mode) — a mouse pointer on desktop doesn't need the extra hit area, and
-   larger buttons there would look out of place next to the boxed layout. */
-@media (max-width: 1023px) {
-  .leaflet-control-zoom a {
-    width: 44px;
-    height: 44px;
-    line-height: 44px;
-    font-size: 20px;
-  }
-
-  .leaflet-touch .leaflet-bar a {
-    width: 44px;
-    height: 44px;
-    line-height: 44px;
-  }
-}
-
-/* Brand-themed light-blue scrollbar (matches surface-accent, #3b82f6)
-   everywhere, in place of the default browser gray. */
-* {
-  scrollbar-width: thin;
-  scrollbar-color: rgba(59, 130, 246, 0.5) transparent;
-}
-
-::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
-}
-
-::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-::-webkit-scrollbar-thumb {
-  background-color: rgba(59, 130, 246, 0.5);
-  border-radius: 9999px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background-color: rgba(59, 130, 246, 0.8);
-}
-
-.leaflet-tooltip {
-  background: #0f172a !important;
-  border: 1px solid #1e293b !important;
-  color: #f1f5f9 !important;
-  font-family: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
-  font-size: 0.75rem;
-}
-
-/* A native CSS animation, not a JS-driven one, so the infinite rotation
-   loops at the compositor level with no restart/reset artifact at the seam
-   the way a JS-recalculated repeat can show. Used by RadarSweep. */
-@keyframes radar-spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(-360deg);
-  }
-}
-
-.animate-radar-spin {
-  animation: radar-spin 4s linear infinite;
-}
-
-/* Same reasoning as radar-spin: a JS-driven repeat on width/height/opacity
-   resets all three at once in theory, but in practice the reset is
-   perceptible as a brief flash at the loop seam. A native CSS animation
-   loops at the compositor level with no such artifact. Used by the
-   broadcast rings in JourneyPanel. */
-@keyframes broadcast-ring {
-  from {
-    transform: translate(-50%, -50%) scale(0);
-    opacity: 0.8;
-  }
-  to {
-    transform: translate(-50%, -50%) scale(1);
-    opacity: 0;
-  }
-}
-
-/* EarthquakeLoader's expanding rings — a plain CSS loop instead of a
-   Framer Motion keyframe-array `animate` (which restarts each cycle by
-   snapping straight back to its first value, reading as a flash). */
-@keyframes loader-ripple {
-  from {
-    width: 0;
-    height: 0;
-    opacity: 0.8;
-  }
-  to {
-    width: 96px;
-    height: 96px;
-    opacity: 0;
-  }
-}
-
-.animate-loader-ripple {
-  animation: loader-ripple 1.6s ease-out infinite;
-}
-
-.animate-broadcast-ring {
-  /* backwards: during each ring's staggered animation-delay, apply the
-     "from" keyframe's centering transform instead of the element's
-     un-animated base styles (which have no transform, so the ring's
-     top-left corner — not its center — would sit at left:50%/top:50%,
-     rendering as a huge circle bottom-right of center). */
-  animation: broadcast-ring 1.8s ease-out infinite backwards;
-}
-
-/* Leaflet CircleMarkers render as SVG <path> elements, so the sensor-burst
-   nodes are animated via fill/stroke (not background-color) — this class is
-   passed through pathOptions.className on the CommandMap's burst markers,
-   alternating cyan/red at a crisp on/off cadence to read as sensor units
-   actively firing accelerometer data, not a soft decorative glow. */
-@keyframes sensor-node-flash {
-  0%,
-  49% {
-    fill: #22d3ee;
-    stroke: #22d3ee;
-  }
-  50%,
-  100% {
-    fill: #ef4444;
-    stroke: #ef4444;
-  }
-}
-
-.sensor-node-flash {
-  animation: sensor-node-flash 0.5s steps(1, jump-none) infinite;
-}
-
-/* Rupture wave rings (RuptureWaveOverlay): a scale + opacity "wobble" so
-   each hand-drawn SVG ring reads as an actively propagating wave rather
-   than a static gradient. `transform-box: fill-box` makes the browser
-   scale each circle around its own geometric center automatically,
-   regardless of where its cx/cy sits on the shared overlay canvas. Each
-   ring sets --ring-opacity inline (its distance-based decay value), so the
-   wobble oscillates around that ring's own baseline instead of a shared one. */
-@keyframes rupture-wobble {
+@keyframes np-blink {
   0%,
   100% {
-    transform: scale(1);
-    opacity: var(--ring-opacity, 0.6);
+    opacity: 1;
   }
   50% {
-    transform: scale(1.08);
-    opacity: calc(var(--ring-opacity, 0.6) * 0.6);
+    opacity: 0.25;
+  }
+}
+.live-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--ok);
+  animation: np-blink 2s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+    scroll-behavior: auto !important;
   }
 }
 
-.rupture-wobble-ring {
-  animation: rupture-wobble 1.8s ease-in-out infinite;
-  transform-box: fill-box;
-  transform-origin: center;
+/* Glass instrument panel. */
+.glass {
+  background: linear-gradient(180deg, rgba(15, 23, 29, 0.92), rgba(8, 13, 17, 0.92));
+  border: 1px solid var(--rule);
+  border-radius: 14px;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.03) inset, 0 30px 60px -30px rgba(0, 0, 0, 0.8);
 }
+.hud {
+  background: rgba(5, 8, 11, 0.62);
+  border: 1px solid rgba(56, 225, 255, 0.14);
+  border-radius: 12px;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+.chip {
+  display: inline-flex;
+  align-items: center;
+  white-space: nowrap;
+  min-height: 34px;
+  padding: 0 0.85rem;
+  border-radius: 999px;
+  border: 1px solid var(--rule-strong);
+  color: var(--ink-2);
+  font-size: 0.82rem;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.chip:hover {
+  color: var(--ink);
+  border-color: var(--ink-3);
+}
+.chip-on {
+  background: rgba(56, 225, 255, 0.12);
+  border-color: rgba(56, 225, 255, 0.5);
+  color: var(--cyan);
+}
+.range {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 28px;
+  background: transparent;
+}
+.range::-webkit-slider-runnable-track {
+  height: 3px;
+  border-radius: 3px;
+  background: var(--rule-strong);
+}
+.range::-moz-range-track {
+  height: 3px;
+  border-radius: 3px;
+  background: var(--rule-strong);
+}
+.range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 18px;
+  height: 18px;
+  margin-top: -7.5px;
+  border-radius: 50%;
+  background: var(--cyan);
+  box-shadow: 0 0 12px rgba(56, 225, 255, 0.7);
+}
+.range::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--cyan);
+}
+.glow-text {
+  text-shadow: 0 0 28px rgba(56, 225, 255, 0.35);
+}
+.grain::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(ellipse at 50% 120%, rgba(5, 8, 11, 0) 40%, rgba(5, 8, 11, 0.9) 100%);
+}
+
+@keyframes npIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+    filter: blur(4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+    filter: none;
+  }
+}
+
+/* Pulse dial: the shockwave that leaves the core when the chapter changes */
+@keyframes npShock {
+  from { transform: scale(1); opacity: 0.9; }
+  to { transform: scale(2.9); opacity: 0; }
+}
+.np-shock { animation: npShock 1.3s cubic-bezier(0.16, 1, 0.3, 1) both; transform-box: view-box; transform-origin: 0 0; }
+.np-shock-late { animation-delay: 0.16s; }
+@media (prefers-reduced-motion: reduce) { .np-shock { animation: none; opacity: 0; } }
+
+/* "How it decides": on desktop each chapter settles to fill the screen */
+@media (min-width: 1024px) {
+  html { scroll-snap-type: y proximity; }
+  .np-chapter { scroll-snap-align: start; }
+}
+
+/* Chapter backdrops (Race, Alert): drifting tinted gradients, paused when off */
+@keyframes npDrift { 0% { transform: translate(-50%, -50%) translate(0, 0) scale(1); } 50% { transform: translate(-50%, -50%) translate(6%, -5%) scale(1.15); } 100% { transform: translate(-50%, -50%) translate(-5%, 4%) scale(0.95); } }
+.np-bd { transition: opacity 0.9s ease; }
+.np-bd * { animation-play-state: paused; }
+.np-bd[data-on="1"] * { animation-play-state: running; }
+.np-blob { position: absolute; border-radius: 9999px; aspect-ratio: 1; animation: npDrift 16s ease-in-out infinite alternate; }
+@media (prefers-reduced-motion: reduce) { .np-bd * { animation: none !important; } }
+
+/* How-it-works stage: one step at a time; slides in from --dx, fades out */
+@keyframes npStepIn { from { opacity: 0; transform: translateX(var(--dx, 0px)) scale(0.97); } to { opacity: 1; transform: none; } }
+.np-step { animation: npStepIn 0.55s cubic-bezier(0.16, 1, 0.3, 1) both; transition: opacity 0.25s ease, transform 0.25s ease; }
+.np-step[data-out="1"] { opacity: 0; transform: translateX(calc(var(--dx, 0px) * -0.6)) scale(0.97); animation: none; }
+@media (prefers-reduced-motion: reduce) { .np-step { animation: none; transition: none; } }

@@ -1,0 +1,38 @@
+[Unit]
+Description=NE-PULSE sensing network backend
+Documentation=https://github.com/Debucker/Ne-pulse/blob/master/docs/DEPLOYMENT.md
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=nepulse
+Group=nepulse
+# All configuration comes from NEPULSE_* variables (see .env.production.example).
+EnvironmentFile=/etc/nepulse/nepulse.env
+ExecStart=/opt/nepulse/nepulse-server -addr 127.0.0.1:8080 -db /var/lib/nepulse/nepulse.db
+Restart=always
+RestartSec=2
+StartLimitIntervalSec=0
+KillSignal=SIGTERM
+TimeoutStopSec=20
+LimitNOFILE=65536
+
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+MemoryDenyWriteExecute=true
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+CapabilityBoundingSet=
+StateDirectory=nepulse
+ReadWritePaths=/var/lib/nepulse
+
+[Install]
+WantedBy=multi-user.target

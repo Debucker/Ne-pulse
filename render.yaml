@@ -1,0 +1,28 @@
+# Render blueprint: the backend as a Docker web service with a persistent
+# disk for the SQLite database. The free plan cannot attach a disk and sleeps
+# when idle, which disconnects every phone; use Starter or above.
+services:
+  - type: web
+    name: nepulse-api
+    runtime: docker
+    plan: starter
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /api/health
+    disk:
+      name: nepulse-data
+      mountPath: /data
+      sizeGB: 5
+    envVars:
+      - key: NEPULSE_SECRET
+        generateValue: true
+      - key: NEPULSE_ADMIN_TOKEN
+        generateValue: true
+      - key: NEPULSE_ALLOWED_ORIGINS
+        value: https://ne-pulse.com,https://www.ne-pulse.com
+      - key: NEPULSE_PUBLIC_URL
+        value: https://ne-pulse.com
+      # ne-pulse.com's API sits behind Cloudflare. Verify with
+      # scripts/verify-production.sh (it prints the IP the server resolved)
+      # and see docs/DEPLOYMENT.md about the directly reachable onrender.com URL.
+      - key: NEPULSE_CLIENT_IP_HEADER
+        value: CF-Connecting-IP

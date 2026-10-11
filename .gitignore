@@ -17,3 +17,8 @@ web/.env*.local
 # OS
 .DS_Store
 Thumbs.db
+
+# Local media renders and generated runtime files
+brag-output/
+web/public/backend.json
+web/tsconfig.tsbuildinfo

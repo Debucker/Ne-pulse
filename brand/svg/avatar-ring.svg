@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="640" height="640" viewBox="0 0 640 640"><defs>
+  <filter id="blur" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="3.2"/></filter>
+  <linearGradient id="wave" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#38e1ff"/><stop offset="0.55" stop-color="#38e1ff"/><stop offset="1" stop-color="#ff7a2f"/></linearGradient>
+  
+</defs><rect width="640" height="640" fill="#05080b"/><circle cx="320" cy="320" r="250" fill="none" stroke="#38e1ff" stroke-width="10"/><g transform="translate(135 115) scale(3.7)" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M14 52 H37 L44.5 27 L55.5 77 L64.5 35 L70.5 52 H86" stroke="#eaf1f4" stroke-width="7.5"/></g></svg>

@@ -18,7 +18,7 @@ export async function GET() {
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          background: "#0f172a",
+          background: "#05080b",
         }}
       >
         <svg
@@ -26,12 +26,12 @@ export async function GET() {
           height="128"
           viewBox="0 0 24 24"
           fill="none"
-          stroke="#3b82f6"
+          stroke="#38e1ff"
           strokeWidth="2.5"
           strokeLinecap="round"
           strokeLinejoin="round"
         >
-          <path d="M2 12h4l2 7 4-14 2 7h8" />
+          <path d="M1 13h5l2-5 3 11 3-15 2.5 9H23" />
         </svg>
       </div>
     ),

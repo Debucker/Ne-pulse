@@ -1,29 +1,29 @@
-{{DOMAIN}}, www.{{DOMAIN}} {
+# API host only: the website is served by Vercel from ne-pulse.com.
+# Caddy obtains TLS automatically and proxies HTTP + WebSockets.
+api.{$DOMAIN:ne-pulse.com} {
 	encode zstd gzip
-
-	# Caddy detects the `Connection: Upgrade` handshake and proxies
-	# WebSocket traffic transparently through reverse_proxy — no special
-	# wss:// handling needed here (unlike Nginx, which requires explicit
-	# `proxy_set_header Upgrade/Connection` directives). Both dashboard
-	# sockets and the hardware/control HTTP API live on the Go backend.
-	@backend path /ws/* /api/*
-	reverse_proxy @backend 127.0.0.1:8080 {
-		header_up X-Forwarded-For {remote_host}
-		header_up X-Forwarded-Proto {scheme}
+	reverse_proxy 127.0.0.1:8080 {
+		# The backend is started with -client-ip-header X-Real-IP; Caddy
+		# overwrites whatever the client sent.
+		header_up X-Real-IP {remote_host}
 	}
-
-	# Everything else (the dashboard UI itself) -> the Next.js standalone
-	# server.
-	reverse_proxy 127.0.0.1:3000 {
-		header_up X-Forwarded-For {remote_host}
-		header_up X-Forwarded-Proto {scheme}
-	}
-
 	header {
-		Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+		Strict-Transport-Security "max-age=63072000; includeSubDomains"
+		-Server
 	}
-
 	log {
-		output file /var/log/caddy/ne-pulse-access.log
+		output file /var/log/caddy/nepulse-api.log {
+			roll_size 50MiB
+			roll_keep 5
+		}
+		# Access logs would contain client IPs; keep only what operations need.
+		format filter {
+			wrap json
+			fields {
+				request>remote_ip delete
+				request>client_ip delete
+				request>headers delete
+			}
+		}
 	}
 }

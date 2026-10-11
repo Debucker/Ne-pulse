@@ -1,0 +1,6 @@
+web
+bin
+docs
+*.db
+*.db-*
+.git

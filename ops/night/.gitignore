@@ -1,0 +1,5 @@
+logs/
+stage/
+status.txt
+supervisor.pid
+STOP

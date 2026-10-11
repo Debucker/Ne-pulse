@@ -1,0 +1,24 @@
+| Scenario | Phones | Units | Quakes detected (cand/corr/conf) | False events (cand/corr+) | Pass |
+|---|---:|---:|---|---|---|
+| 01-one-noisy-phone | 1 | 1 | 0/0/0 of 0 | 0 / 0 | true |
+| 02-ten-unrelated-phones | 10 | 9 | 0/0/0 of 0 | 0 / 0 | true |
+| 03-hundred-unrelated-phones | 100 | 90 | 0/0/0 of 0 | 1 / 0 | true |
+| 04-genuine-quake | 300 | 193 | 1/1/1 of 1 | 0 / 0 | true |
+| 05-weak-quake | 300 | 186 | 0/0/0 of 1 | 1 / 0 | true |
+| 06-strong-quake | 300 | 183 | 1/1/1 of 1 | 0 / 0 | true |
+| 07-one-building-cluster | 240 | 147 | 0/0/0 of 0 | 2 / 0 | true |
+| 08-separated-clusters | 180 | 95 | 0/0/0 of 0 | 0 / 0 | true |
+| 09-missing-telemetry | 300 | 186 | 1/1/1 of 1 | 0 / 0 | true |
+| 10-delayed-telemetry | 300 | 226 | 1/1/1 of 1 | 0 / 0 | true |
+| 11-duplicate-telemetry | 300 | 174 | 1/1/1 of 1 | 0 / 0 | true |
+| 12-incorrect-timestamps | 300 | 169 | 1/1/1 of 1 | 1 / 0 | true |
+| 13-offline-devices | 300 | 159 | 1/1/1 of 1 | 0 / 0 | true |
+| 14-network-spike | 1150 | 420 | 1/1/1 of 1 | 0 / 0 | true |
+| X1-sonic-boom | 300 | 165 | 0/0/0 of 0 | 1 / 0 | true |
+| X2-traffic-convoy | 300 | 192 | 0/0/0 of 0 | 0 / 0 | true |
+| X3-sybil-one-network | 260 | 190 | 0/0/0 of 0 | 1 / 0 | true |
+| X4-sybil-ten-networks | 260 | 207 | 0/0/0 of 0 | 0 / 1 | true |
+| X5-crowd-walking | 400 | 55 | 0/0/0 of 0 | 0 / 0 | true |
+| X6-shaking-and-sliding | 200 | 149 | 0/0/0 of 0 | 0 / 0 | true |
+| X7-prank-countdown-20pct | 300 | 184 | 0/0/0 of 0 | 1 / 0 | true |
+| X8-prank-countdown-40pct | 300 | 196 | 0/0/0 of 0 | 1 / 0 | true |

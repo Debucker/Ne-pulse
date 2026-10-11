@@ -14,7 +14,7 @@ export default function OpengraphImage() {
           flexDirection: "column",
           alignItems: "center",
           justifyContent: "center",
-          background: "#020617",
+          background: "#05080b",
           color: "#f8fafc",
           fontFamily: "sans-serif",
         }}
@@ -26,19 +26,19 @@ export default function OpengraphImage() {
               width: 72,
               height: 72,
               borderRadius: 16,
-              background: "#0f172a",
+              background: "#05080b",
               alignItems: "center",
               justifyContent: "center",
             }}
           >
-            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M2 12h4l2 7 4-14 2 7h8" />
+            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#38e1ff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M1 13h5l2-5 3 11 3-15 2.5 9H23" />
             </svg>
           </div>
           <div style={{ display: "flex", fontSize: 56, fontWeight: 700, letterSpacing: -1 }}>NE-PULSE</div>
         </div>
         <div style={{ display: "flex", fontSize: 30, color: "#94a3b8", maxWidth: 820, textAlign: "center" }}>
-          Every phone is a sensor. Every second is a life.
+          A seismic research network made of phones lying still.
         </div>
       </div>
     ),

@@ -1,6 +1,8 @@
 package ratelimit
 
 import (
+	"fmt"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -64,56 +66,47 @@ func TestLimiter_SweepEvictsStaleBuckets(t *testing.T) {
 	}
 }
 
+func peer(r *http.Request) string {
+	host, _, _ := net.SplitHostPort(r.RemoteAddr)
+	return host
+}
+
 func TestMiddleware_RejectsWithTooManyRequestsOnceBudgetExhausted(t *testing.T) {
 	l := New(1, 1)
 	called := 0
-	handler := l.Middleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handler := l.Middleware(peer, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		called++
 		w.WriteHeader(http.StatusOK)
 	}))
-
-	req1 := httptest.NewRequest(http.MethodPost, "/api/ingress/hardware", nil)
-	req1.RemoteAddr = "9.9.9.9:1234"
-	rec1 := httptest.NewRecorder()
-	handler.ServeHTTP(rec1, req1)
-	if rec1.Code != http.StatusOK {
-		t.Fatalf("first request status = %d, want 200", rec1.Code)
-	}
-
-	req2 := httptest.NewRequest(http.MethodPost, "/api/ingress/hardware", nil)
-	req2.RemoteAddr = "9.9.9.9:1234"
-	rec2 := httptest.NewRecorder()
-	handler.ServeHTTP(rec2, req2)
-	if rec2.Code != http.StatusTooManyRequests {
-		t.Errorf("second immediate request status = %d, want 429", rec2.Code)
+	for i, want := range []int{http.StatusOK, http.StatusTooManyRequests} {
+		req := httptest.NewRequest(http.MethodPost, "/api/v1/devices", nil)
+		req.RemoteAddr = "9.9.9.9:1234"
+		rec := httptest.NewRecorder()
+		handler.ServeHTTP(rec, req)
+		if rec.Code != want {
+			t.Fatalf("request %d status = %d, want %d", i, rec.Code, want)
+		}
 	}
 	if called != 1 {
-		t.Errorf("wrapped handler called %d times, want exactly 1 (the rejected request must not reach it)", called)
+		t.Errorf("wrapped handler called %d times, want 1", called)
 	}
 }
 
-func TestMiddleware_UsesXForwardedForFirstHopWhenPresent(t *testing.T) {
+// The previous implementation keyed on the left-most X-Forwarded-For entry,
+// which the client controls: rotating it bypassed the limit entirely.
+func TestMiddleware_SpoofedForwardedForDoesNotBypassLimit(t *testing.T) {
 	l := New(1, 1)
-	handler := l.Middleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-	}))
-
-	// Two requests share the same RemoteAddr (as they would behind a
-	// reverse proxy) but declare different original clients via XFF — each
-	// should get its own independent budget.
-	req1 := httptest.NewRequest(http.MethodPost, "/api/ingress/hardware", nil)
-	req1.RemoteAddr = "127.0.0.1:9999"
-	req1.Header.Set("X-Forwarded-For", "203.0.113.5")
-	rec1 := httptest.NewRecorder()
-	handler.ServeHTTP(rec1, req1)
-
-	req2 := httptest.NewRequest(http.MethodPost, "/api/ingress/hardware", nil)
-	req2.RemoteAddr = "127.0.0.1:9999"
-	req2.Header.Set("X-Forwarded-For", "203.0.113.9")
-	rec2 := httptest.NewRecorder()
-	handler.ServeHTTP(rec2, req2)
-
-	if rec1.Code != http.StatusOK || rec2.Code != http.StatusOK {
-		t.Errorf("distinct XFF clients behind the same proxy should each get their own budget: got %d, %d", rec1.Code, rec2.Code)
+	handler := l.Middleware(peer, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(http.StatusOK) }))
+	codes := []int{}
+	for i := 0; i < 3; i++ {
+		req := httptest.NewRequest(http.MethodPost, "/api/v1/devices", nil)
+		req.RemoteAddr = "198.51.100.7:5555"
+		req.Header.Set("X-Forwarded-For", fmt.Sprintf("203.0.113.%d", i))
+		rec := httptest.NewRecorder()
+		handler.ServeHTTP(rec, req)
+		codes = append(codes, rec.Code)
+	}
+	if codes[1] != http.StatusTooManyRequests || codes[2] != http.StatusTooManyRequests {
+		t.Fatalf("spoofed XFF bypassed the limiter: %v", codes)
 	}
 }

@@ -12,3 +12,4 @@ out
 .env.production
 .env.production.local
 !.env*.example
+*.tsbuildinfo

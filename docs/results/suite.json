@@ -1,0 +1,1264 @@
+{
+  "algorithm": "nepulse-detect/2.0.0",
+  "generated": "2026-09-30T11:55:28Z",
+  "rows": [
+    {
+      "scenario": "01-one-noisy-phone",
+      "description": "One phone, 40 everyday disturbances per hour for 30 min.",
+      "devices": 1,
+      "units": 1,
+      "eligibleAtQuake": 0,
+      "quakes": 0,
+      "events": null,
+      "quakesDetectedByLevel": {},
+      "falseEventsByLevel": {},
+      "pickClasses": {
+        "handling": 1,
+        "impulsive": 1,
+        "seismic": 10
+      },
+      "engine": {
+        "PicksAccepted": 10,
+        "PicksRejected": 2,
+        "PicksDuplicate": 0,
+        "PicksUnknownStation": 0,
+        "PicksStale": 0,
+        "PicksDowngraded": 0,
+        "VotesFormed": 10,
+        "EventsCreated": 0,
+        "EventsCorroborated": 0,
+        "EventsConfirmed": 0,
+        "EventsDismissed": 0
+      },
+      "samples": 180000,
+      "wallSec": 0.752,
+      "pass": true
+    },
+    {
+      "scenario": "02-ten-unrelated-phones",
+      "description": "10 phones, independent disturbances (12/h each), 30 min.",
+      "devices": 10,
+      "units": 9,
+      "eligibleAtQuake": 0,
+      "quakes": 0,
+      "events": null,
+      "quakesDetectedByLevel": {},
+      "falseEventsByLevel": {},
+      "pickClasses": {
+        "handling": 11,
+        "impulsive": 5,
+        "seismic": 33
+      },
+      "engine": {
+        "PicksAccepted": 33,
+        "PicksRejected": 16,
+        "PicksDuplicate": 0,
+        "PicksUnknownStation": 0,
+        "PicksStale": 0,
+        "PicksDowngraded": 0,
+        "VotesFormed": 33,
+        "EventsCreated": 0,
+        "EventsCorroborated": 0,
+        "EventsConfirmed": 0,
+        "EventsDismissed": 0
+      },
+      "samples": 1637984,
+      "wallSec": 3.889,
+      "pass": true
+    },
+    {
+      "scenario": "03-hundred-unrelated-phones",
+      "description": "100 phones, independent disturbances (8/h each), 30 min.",
+      "devices": 100,
+      "units": 90,
+      "eligibleAtQuake": 0,
+      "quakes": 0,
+      "events": [
+        {
+          "id": "NP-20270115-082841-1",
+          "level": "candidate",
+          "outcome": "dismissed",
+          "units": 3,
+          "stations": 3,
+          "log10PAdj": -3.906,
+          "consistency": 0.6,
+          "footprintFraction": 1,
+          "quake": -1,
+          "locErrKm": 0,
+          "locUncKm": 96.52,
+          "originErrSec": 0,
+          "latencyCandidate": 0,
+          "latencyCorroborated": 0,
+          "latencyConfirmed": 0,
+          "failedChecks": [
+            "independent units",
+            "log10 adjusted p-value"
+          ]
+        }
+      ],
+      "quakesDetectedByLevel": {},
+      "falseEventsByLevel": {
+        "candidate": 1
+      },
+      "pickClasses": {
+        "handling": 61,
+        "impulsive": 34,
+        "seismic": 166,
+        "unsettled": 1
+      },
+      "engine": {
+        "PicksAccepted": 166,
+        "PicksRejected": 96,
+        "PicksDuplicate": 0,
+        "PicksUnknownStation": 0,
+        "PicksStale": 0,
+        "PicksDowngraded": 2,
+        "VotesFormed": 166,
+        "EventsCreated": 1,
+        "EventsCorroborated": 0,
+        "EventsConfirmed": 0,
+        "EventsDismissed": 1
+      },
+      "samples": 16055860,
+      "wallSec": 53.534,
+      "pass": true
+    },
+    {
+      "scenario": "04-genuine-quake",
+      "description": "300 phones in a city, moderate quake (2 m/s² peak S at 10 km) inside the network.",
+      "devices": 300,
+      "units": 193,
+      "eligibleAtQuake": 299,
+      "quakes": 1,
+      "events": [
+        {
+          "id": "NP-20270115-080229-1",
+          "level": "confirmed",
+          "outcome": "closed",
+          "units": 182,
+          "stations": 267,
+          "log10PAdj": -296.718,
+          "consistency": 0.995,
+          "footprintFraction": 1,
+          "quake": 0,
+          "locErrKm": 3.446,
+          "locUncKm": 8.287,
+          "originErrSec": -0.265,
+          "latencyCandidate": 6,
+          "latencyCorroborated": 14,
+          "latencyConfirmed": 22
+        }
+      ],
+      "quakesDetectedByLevel": {
+        "candidate": 1,
+        "confirmed": 1,
+        "corroborated": 1
+      },
+      "falseEventsByLevel": {},
+      "pickClasses": {
+        "handling": 11,
+        "impulsive": 1,
+        "seismic": 287,
+        "unsettled": 5
+      },
+      "engine": {
+        "PicksAccepted": 287,
+        "PicksRejected": 17,
+        "PicksDuplicate": 0,
+        "PicksUnknownStation": 0,
+        "PicksStale": 0,
+        "PicksDowngraded": 0,
+        "VotesFormed": 211,
+        "EventsCreated": 1,
+        "EventsCorroborated": 1,
+        "EventsConfirmed": 1,
+        "EventsDismissed": 0
+      },
+      "samples": 7778944,
+      "wallSec": 32.027,
+      "pass": true
+    },
+    {
+      "scenario": "05-weak-quake",
+      "description": "Same network, weak quake (0.06 m/s² ≈ 0.6 %g at 10 km, MMI ~III): below most phones' threshold.",
+      "devices": 300,
+      "units": 186,
+      "eligibleAtQuake": 300,
+      "quakes": 1,
+      "events": [
+        {
+          "id": "NP-20270115-080402-1",
+          "level": "candidate",
+          "outcome": "dismissed",
+          "units": 3,
+          "stations": 3,
+          "log10PAdj": -3.486,
+          "consistency": 0.5,
+          "footprintFraction": 1,
+          "quake": -1,
+          "locErrKm": 0,
+          "locUncKm": 94.919,
+          "originErrSec": 0,
+          "latencyCandidate": 0,
+          "latencyCorroborated": 0,
+          "latencyConfirmed": 0,
+          "failedChecks": [
+            "independent units",
+            "log10 adjusted p-value",
+            "consistency"
+          ]
+        }
+      ],
+      "quakesDetectedByLevel": {},
+      "falseEventsByLevel": {
+        "candidate": 1
+      },
+      "pickClasses": {
+        "handling": 6,
+        "impulsive": 1,
+        "seismic": 21
+      },
+      "engine": {
+        "PicksAccepted": 21,
+        "PicksRejected": 7,
+        "PicksDuplicate": 0,
+        "PicksUnknownStation": 0,
+        "PicksStale": 0,
+        "PicksDowngraded": 0,
+        "VotesFormed": 16,
+        "EventsCreated": 1,
+        "EventsCorroborated": 0,
+        "EventsConfirmed": 0,
+        "EventsDismissed": 1
+      },
+      "samples": 8282921,
+      "wallSec": 41.483,
+      "pass": true
+    },
+    {
+      "scenario": "06-strong-quake",
+      "description": "Same network, strong quake (8 m/s² at 10 km): clipping, phones sliding.",
+      "devices": 300,
+      "units": 183,
+      "eligibleAtQuake": 300,
+      "quakes": 1,
+      "events": [
+        {
+          "id": "NP-20270115-080229-1",
+          "level": "confirmed",
+          "outcome": "closed",
+          "units": 173,
+          "stations": 279,
+          "log10PAdj": -296.79,
+          "consistency": 1,
+          "footprintFraction": 0.989,
+          "quake": 0,
+          "locErrKm": 2.682,
+          "locUncKm": 17.392,
+          "originErrSec": -0.934,
+          "latencyCandidate": 6,
+          "latencyCorroborated": 14,
+          "latencyConfirmed": 21
+        }
+      ],
+      "quakesDetectedByLevel": {
+        "candidate": 1,
+        "confirmed": 1,
+        "corroborated": 1
+      },
+      "falseEventsByLevel": {},
+      "pickClasses": {
+        "handling": 5,
+        "impulsive": 5,
+        "seismic": 296,
+        "unsettled": 5
+      },
+      "engine": {
+        "PicksAccepted": 296,
+        "PicksRejected": 15,
+        "PicksDuplicate": 0,
+        "PicksUnknownStation": 0,
+        "PicksStale": 0,
+        "PicksDowngraded": 0,
+        "VotesFormed": 196,
+        "EventsCreated": 1,
+        "EventsCorroborated": 1,
+        "EventsConfirmed": 1,
+        "EventsDismissed": 0
+      },
+      "samples": 7856932,
+      "wallSec": 26.829,
+      "pass": true
+    },
+    {
+      "scenario": "07-one-building-cluster",
+      "description": "40 phones in one building register furniture moving 3 times, 200 phones elsewhere.",
+      "devices": 240,
+      "units": 147,
+      "eligibleAtQuake": 0,
+      "quakes": 0,
+      "events": [
+        {
+          "id": "NP-20270115-080317-2",
+          "level": "candidate",
+          "outcome": "dismissed",
+          "units": 3,
+          "stations": 30,
+          "log10PAdj": -2.741,
+          "consistency": 1,
+          "footprintFraction": 0.429,
+          "quake": -1,
+          "locErrKm": 0,
+          "locUncKm": 43.901,
+          "originErrSec": 0,
+          "latencyCandidate": 0,
+          "latencyCorroborated": 0,
+          "latencyConfirmed": 0,
+          "failedChecks": [
+            "independent units",
+            "log10 adjusted p-value",
+            "aperture km",
+            "amplitude contradictions"
+          ]
+        },
+        {
+          "id": "NP-20270115-080447-1",
+          "level": "candidate",
+          "outcome": "dismissed",
+          "units": 3,
+          "stations": 30,
+          "log10PAdj": -2.415,
+          "consistency": 1,
+          "footprintFraction": 0.3,
+          "quake": -1,
+          "locErrKm": 0,
+          "locUncKm": 44.642,
+          "originErrSec": 0,
+          "latencyCandidate": 0,
+          "latencyCorroborated": 0,
+          "latencyConfirmed": 0,
+          "failedChecks": [
+            "independent units",
+            "log10 adjusted p-value",
+            "aperture km",
+            "amplitude contradictions"
+          ]
+        }
+      ],
+      "quakesDetectedByLevel": {},
+      "falseEventsByLevel": {
+        "candidate": 2
+      },
+      "pickClasses": {
+        "handling": 4,
+        "impulsive": 3,
+        "seismic": 107
+      },
+      "engine": {
+        "PicksAccepted": 107,
+        "PicksRejected": 7,
+        "PicksDuplicate": 0,
+        "PicksUnknownStation": 0,
+        "PicksStale": 0,
+        "PicksDowngraded": 0,
+        "VotesFormed": 23,
+        "EventsCreated": 2,
+        "EventsCorroborated": 0,
+        "EventsConfirmed": 0,
+        "EventsDismissed": 2
+      },
+      "samples": 12923889,
+      "wallSec": 36.427,
+      "pass": true
+    },
+    {
+      "scenario": "08-separated-clusters",
+      "description": "Three towns 45-55 km apart; a building-scale disturbance hits 20 phones in each at the same moment.",
+      "devices": 180,
+      "units": 95,
+      "eligibleAtQuake": 0,
+      "quakes": 0,
+      "events": null,
+      "quakesDetectedByLevel": {},
+      "falseEventsByLevel": {},
+      "pickClasses": {
+        "seismic": 51
+      },
+      "engine": {
+        "PicksAccepted": 51,
+        "PicksRejected": 0,
+        "PicksDuplicate": 0,
+        "PicksUnknownStation": 0,
+        "PicksStale": 0,
+        "PicksDowngraded": 0,
+        "VotesFormed": 4,
+        "EventsCreated": 0,
+        "EventsCorroborated": 0,
+        "EventsConfirmed": 0,
+        "EventsDismissed": 0
+      },
+      "samples": 7900724,
+      "wallSec": 22.091,
+      "pass": true
+    },
+    {
+      "scenario": "09-missing-telemetry",
+      "description": "Genuine quake; 30% of phones drop out from 5 s before to 20 s after the origin.",
+      "devices": 300,
+      "units": 186,
+      "eligibleAtQuake": 216,
+      "quakes": 1,
+      "events": [
+        {
+          "id": "NP-20270115-080229-1",
+          "level": "confirmed",
+          "outcome": "closed",
+          "units": 141,
+          "stations": 198,
+          "log10PAdj": -296.815,
+          "consistency": 1,
+          "footprintFraction": 0.839,
+          "quake": 0,
+          "locErrKm": 4.702,
+          "locUncKm": 10.182,
+          "originErrSec": -0.486,
+          "latencyCandidate": 6,
+          "latencyCorroborated": 14,
+          "latencyConfirmed": 21
+        }
+      ],
+      "quakesDetectedByLevel": {
+        "candidate": 1,
+        "confirmed": 1,
+        "corroborated": 1
+      },
+      "falseEventsByLevel": {},
+      "pickClasses": {
+        "handling": 5,
+        "impulsive": 4,
+        "seismic": 222,
+        "unsettled": 4
+      },
+      "engine": {
+        "PicksAccepted": 222,
+        "PicksRejected": 13,
+        "PicksDuplicate": 0,
+        "PicksUnknownStation": 0,
+        "PicksStale": 0,
+        "PicksDowngraded": 0,
+        "VotesFormed": 174,
+        "EventsCreated": 1,
+        "EventsCorroborated": 1,
+        "EventsConfirmed": 1,
+        "EventsDismissed": 0
+      },
+      "samples": 7497686,
+      "wallSec": 19.246,
+      "pass": true
+    },
+    {
+      "scenario": "10-delayed-telemetry",
+      "description": "Genuine quake; half the phones deliver everything 20-40 s late.",
+      "devices": 300,
+      "units": 226,
+      "eligibleAtQuake": 299,
+      "quakes": 1,
+      "events": [
+        {
+          "id": "NP-20270115-080229-1",
+          "level": "confirmed",
+          "outcome": "closed",
+          "units": 221,
+          "stations": 281,
+          "log10PAdj": -296.687,
+          "consistency": 1,
+          "footprintFraction": 1.028,
+          "quake": 0,
+          "locErrKm": 3.167,
+          "locUncKm": 6.548,
+          "originErrSec": -0.158,
+          "latencyCandidate": 6,
+          "latencyCorroborated": 36,
+          "latencyConfirmed": 46
+        }
+      ],
+      "quakesDetectedByLevel": {
+        "candidate": 1,
+        "confirmed": 1,
+        "corroborated": 1
+      },
+      "falseEventsByLevel": {},
+      "pickClasses": {
+        "handling": 5,
+        "impulsive": 1,
+        "seismic": 293,
+        "unsettled": 4
+      },
+      "engine": {
+        "PicksAccepted": 293,
+        "PicksRejected": 10,
+        "PicksDuplicate": 0,
+        "PicksUnknownStation": 0,
+        "PicksStale": 0,
+        "PicksDowngraded": 1,
+        "VotesFormed": 243,
+        "EventsCreated": 1,
+        "EventsCorroborated": 1,
+        "EventsConfirmed": 1,
+        "EventsDismissed": 0
+      },
+      "samples": 7907947,
+      "wallSec": 25.406,
+      "pass": true
+    },
+    {
+      "scenario": "11-duplicate-telemetry",
+      "description": "Genuine quake; every report is delivered twice.",
+      "devices": 300,
+      "units": 174,
+      "eligibleAtQuake": 299,
+      "quakes": 1,
+      "events": [
+        {
+          "id": "NP-20270115-080229-1",
+          "level": "confirmed",
+          "outcome": "closed",
+          "units": 170,
+          "stations": 282,
+          "log10PAdj": -296.676,
+          "consistency": 1,
+          "footprintFraction": 1.006,
+          "quake": 0,
+          "locErrKm": 4.182,
+          "locUncKm": 11.662,
+          "originErrSec": -0.192,
+          "latencyCandidate": 6,
+          "latencyCorroborated": 14,
+          "latencyConfirmed": 22
+        }
+      ],
+      "quakesDetectedByLevel": {
+        "candidate": 1,
+        "confirmed": 1,
+        "corroborated": 1
+      },
+      "falseEventsByLevel": {},
+      "pickClasses": {
+        "handling": 10,
+        "impulsive": 8,
+        "seismic": 616,
+        "unsettled": 10
+      },
+      "engine": {
+        "PicksAccepted": 308,
+        "PicksRejected": 28,
+        "PicksDuplicate": 308,
+        "PicksUnknownStation": 0,
+        "PicksStale": 0,
+        "PicksDowngraded": 0,
+        "VotesFormed": 209,
+        "EventsCreated": 1,
+        "EventsCorroborated": 1,
+        "EventsConfirmed": 1,
+        "EventsDismissed": 0
+      },
+      "samples": 7583951,
+      "wallSec": 19.256,
+      "pass": true
+    },
+    {
+      "scenario": "12-incorrect-timestamps",
+      "description": "Genuine quake; 25% of phones have clocks off by 2-8 s despite synchronisation.",
+      "devices": 300,
+      "units": 169,
+      "eligibleAtQuake": 298,
+      "quakes": 1,
+      "events": [
+        {
+          "id": "NP-20270115-080222-1",
+          "level": "confirmed",
+          "outcome": "closed",
+          "units": 139,
+          "stations": 204,
+          "log10PAdj": -296.811,
+          "consistency": 0.874,
+          "footprintFraction": 0.874,
+          "quake": 0,
+          "locErrKm": 1.007,
+          "locUncKm": 6.634,
+          "originErrSec": 0.566,
+          "latencyCandidate": 0,
+          "latencyCorroborated": 14,
+          "latencyConfirmed": 21
+        },
+        {
+          "id": "NP-20270115-080436-2",
+          "level": "candidate",
+          "outcome": "dismissed",
+          "units": 3,
+          "stations": 3,
+          "log10PAdj": -3.288,
+          "consistency": 0.6,
+          "footprintFraction": 1,
+          "quake": -1,
+          "locErrKm": 0,
+          "locUncKm": 60.312,
+          "originErrSec": 0,
+          "latencyCandidate": 0,
+          "latencyCorroborated": 0,
+          "latencyConfirmed": 0,
+          "failedChecks": [
+            "independent units",
+            "log10 adjusted p-value"
+          ]
+        }
+      ],
+      "quakesDetectedByLevel": {
+        "candidate": 1,
+        "confirmed": 1,
+        "corroborated": 1
+      },
+      "falseEventsByLevel": {
+        "candidate": 1
+      },
+      "pickClasses": {
+        "handling": 7,
+        "impulsive": 3,
+        "seismic": 299,
+        "unsettled": 3
+      },
+      "engine": {
+        "PicksAccepted": 299,
+        "PicksRejected": 13,
+        "PicksDuplicate": 0,
+        "PicksUnknownStation": 0,
+        "PicksStale": 0,
+        "PicksDowngraded": 1,
+        "VotesFormed": 212,
+        "EventsCreated": 2,
+        "EventsCorroborated": 1,
+        "EventsConfirmed": 1,
+        "EventsDismissed": 1
+      },
+      "samples": 8393918,
+      "wallSec": 20.076,
+      "pass": true
+    },
+    {
+      "scenario": "13-offline-devices",
+      "description": "Genuine quake; half the phones went offline a minute before it.",
+      "devices": 300,
+      "units": 159,
+      "eligibleAtQuake": 163,
+      "quakes": 1,
+      "events": [
+        {
+          "id": "NP-20270115-080229-1",
+          "level": "confirmed",
+          "outcome": "closed",
+          "units": 106,
+          "stations": 159,
+          "log10PAdj": -276.254,
+          "consistency": 1,
+          "footprintFraction": 1,
+          "quake": 0,
+          "locErrKm": 4.521,
+          "locUncKm": 13.196,
+          "originErrSec": 0.473,
+          "latencyCandidate": 6,
+          "latencyCorroborated": 14,
+          "latencyConfirmed": 21
+        }
+      ],
+      "quakesDetectedByLevel": {
+        "candidate": 1,
+        "confirmed": 1,
+        "corroborated": 1
+      },
+      "falseEventsByLevel": {},
+      "pickClasses": {
+        "handling": 3,
+        "impulsive": 1,
+        "seismic": 168,
+        "unsettled": 1
+      },
+      "engine": {
+        "PicksAccepted": 168,
+        "PicksRejected": 5,
+        "PicksDuplicate": 0,
+        "PicksUnknownStation": 0,
+        "PicksStale": 0,
+        "PicksDowngraded": 0,
+        "VotesFormed": 125,
+        "EventsCreated": 1,
+        "EventsCorroborated": 1,
+        "EventsConfirmed": 1,
+        "EventsDismissed": 0
+      },
+      "samples": 5870884,
+      "wallSec": 13.134,
+      "pass": true
+    },
+    {
+      "scenario": "14-network-spike",
+      "description": "150 established phones; 1000 new phones join within 10 s, 15 s before a genuine quake.",
+      "devices": 1150,
+      "units": 420,
+      "eligibleAtQuake": 149,
+      "quakes": 1,
+      "events": [
+        {
+          "id": "NP-20270115-080229-1",
+          "level": "confirmed",
+          "outcome": "closed",
+          "units": 120,
+          "stations": 152,
+          "log10PAdj": -296.737,
+          "consistency": 1,
+          "footprintFraction": 1.008,
+          "quake": 0,
+          "locErrKm": 5.585,
+          "locUncKm": 12.302,
+          "originErrSec": 0.802,
+          "latencyCandidate": 6,
+          "latencyCorroborated": 15,
+          "latencyConfirmed": 22
+        }
+      ],
+      "quakesDetectedByLevel": {
+        "candidate": 1,
+        "confirmed": 1,
+        "corroborated": 1
+      },
+      "falseEventsByLevel": {},
+      "pickClasses": {
+        "handling": 3,
+        "impulsive": 1,
+        "seismic": 162,
+        "unsettled": 2
+      },
+      "engine": {
+        "PicksAccepted": 162,
+        "PicksRejected": 6,
+        "PicksDuplicate": 0,
+        "PicksUnknownStation": 0,
+        "PicksStale": 0,
+        "PicksDowngraded": 0,
+        "VotesFormed": 130,
+        "EventsCreated": 1,
+        "EventsCorroborated": 1,
+        "EventsConfirmed": 1,
+        "EventsDismissed": 0
+      },
+      "samples": 18516058,
+      "wallSec": 39.63,
+      "pass": true
+    },
+    {
+      "scenario": "X1-sonic-boom",
+      "description": "An acoustic front (0.343 km/s) crosses a 300-phone city and shakes every building.",
+      "devices": 300,
+      "units": 165,
+      "eligibleAtQuake": 0,
+      "quakes": 0,
+      "events": [
+        {
+          "id": "NP-20270115-080310-1",
+          "level": "candidate",
+          "outcome": "dismissed",
+          "units": 30,
+          "stations": 59,
+          "log10PAdj": -39.745,
+          "consistency": 0.577,
+          "footprintFraction": 0.3,
+          "quake": -1,
+          "locErrKm": 0,
+          "locUncKm": 32.273,
+          "originErrSec": 0,
+          "latencyCandidate": 0,
+          "latencyCorroborated": 0,
+          "latencyConfirmed": 0,
+          "failedChecks": [
+            "consistency",
+            "amplitude contradictions",
+            "sweep apparent velocity km/s"
+          ]
+        }
+      ],
+      "quakesDetectedByLevel": {},
+      "falseEventsByLevel": {
+        "candidate": 1
+      },
+      "pickClasses": {
+        "seismic": 222
+      },
+      "engine": {
+        "PicksAccepted": 222,
+        "PicksRejected": 0,
+        "PicksDuplicate": 0,
+        "PicksUnknownStation": 0,
+        "PicksStale": 0,
+        "PicksDowngraded": 0,
+        "VotesFormed": 160,
+        "EventsCreated": 1,
+        "EventsCorroborated": 0,
+        "EventsConfirmed": 0,
+        "EventsDismissed": 1
+      },
+      "samples": 10783901,
+      "wallSec": 29.229,
+      "pass": true
+    },
+    {
+      "scenario": "X2-traffic-convoy",
+      "description": "A heavy convoy drives through the city at 54 km/h shaking phones near its route.",
+      "devices": 300,
+      "units": 192,
+      "eligibleAtQuake": 0,
+      "quakes": 0,
+      "events": null,
+      "quakesDetectedByLevel": {},
+      "falseEventsByLevel": {},
+      "pickClasses": {
+        "seismic": 17
+      },
+      "engine": {
+        "PicksAccepted": 17,
+        "PicksRejected": 0,
+        "PicksDuplicate": 0,
+        "PicksUnknownStation": 0,
+        "PicksStale": 0,
+        "PicksDowngraded": 0,
+        "VotesFormed": 10,
+        "EventsCreated": 0,
+        "EventsCorroborated": 0,
+        "EventsConfirmed": 0,
+        "EventsDismissed": 0
+      },
+      "samples": 65111458,
+      "wallSec": 197.779,
+      "pass": true
+    },
+    {
+      "scenario": "X3-sybil-one-network",
+      "description": "60 fake phones on one network stream physically consistent fabricated quake waveforms.",
+      "devices": 260,
+      "units": 190,
+      "eligibleAtQuake": 0,
+      "quakes": 0,
+      "events": [
+        {
+          "id": "NP-20270115-080229-1",
+          "level": "candidate",
+          "outcome": "dismissed",
+          "units": 55,
+          "stations": 60,
+          "log10PAdj": -119.299,
+          "consistency": 1,
+          "footprintFraction": 0.917,
+          "quake": -1,
+          "locErrKm": 0,
+          "locUncKm": 22.534,
+          "originErrSec": 0,
+          "latencyCandidate": 0,
+          "latencyCorroborated": 0,
+          "latencyConfirmed": 0,
+          "failedChecks": [
+            "distinct network sources"
+          ]
+        }
+      ],
+      "quakesDetectedByLevel": {},
+      "falseEventsByLevel": {
+        "candidate": 1
+      },
+      "pickClasses": {
+        "seismic": 60
+      },
+      "engine": {
+        "PicksAccepted": 60,
+        "PicksRejected": 0,
+        "PicksDuplicate": 0,
+        "PicksUnknownStation": 0,
+        "PicksStale": 0,
+        "PicksDowngraded": 0,
+        "VotesFormed": 55,
+        "EventsCreated": 1,
+        "EventsCorroborated": 0,
+        "EventsConfirmed": 0,
+        "EventsDismissed": 1
+      },
+      "samples": 8463948,
+      "wallSec": 17.945,
+      "pass": true
+    },
+    {
+      "scenario": "X4-sybil-ten-networks",
+      "description": "Same fabricated quake from 60 fake phones spread over 10 networks (residual-risk case).",
+      "devices": 260,
+      "units": 207,
+      "eligibleAtQuake": 0,
+      "quakes": 0,
+      "events": [
+        {
+          "id": "NP-20270115-080229-1",
+          "level": "corroborated",
+          "outcome": "closed",
+          "units": 57,
+          "stations": 60,
+          "log10PAdj": -143.62,
+          "consistency": 1,
+          "footprintFraction": 0.966,
+          "quake": -1,
+          "locErrKm": 0,
+          "locUncKm": 13.322,
+          "originErrSec": 0,
+          "latencyCandidate": 0,
+          "latencyCorroborated": 0,
+          "latencyConfirmed": 0,
+          "failedChecks": [
+            "established devices",
+            "established fraction"
+          ]
+        }
+      ],
+      "quakesDetectedByLevel": {},
+      "falseEventsByLevel": {
+        "corroborated": 1
+      },
+      "pickClasses": {
+        "seismic": 60
+      },
+      "engine": {
+        "PicksAccepted": 60,
+        "PicksRejected": 0,
+        "PicksDuplicate": 0,
+        "PicksUnknownStation": 0,
+        "PicksStale": 0,
+        "PicksDowngraded": 0,
+        "VotesFormed": 57,
+        "EventsCreated": 1,
+        "EventsCorroborated": 1,
+        "EventsConfirmed": 0,
+        "EventsDismissed": 0
+      },
+      "samples": 8747945,
+      "wallSec": 18.281,
+      "pass": true
+    },
+    {
+      "scenario": "X5-crowd-walking",
+      "description": "400 people walking or holding their phones (a Telegram crowd opening the link on the street).",
+      "devices": 400,
+      "units": 55,
+      "eligibleAtQuake": 0,
+      "quakes": 0,
+      "events": null,
+      "quakesDetectedByLevel": {},
+      "falseEventsByLevel": {},
+      "pickClasses": {},
+      "engine": {
+        "PicksAccepted": 0,
+        "PicksRejected": 0,
+        "PicksDuplicate": 0,
+        "PicksUnknownStation": 0,
+        "PicksStale": 0,
+        "PicksDowngraded": 0,
+        "VotesFormed": 0,
+        "EventsCreated": 0,
+        "EventsCorroborated": 0,
+        "EventsConfirmed": 0,
+        "EventsDismissed": 0
+      },
+      "samples": 31976740,
+      "wallSec": 232.386,
+      "pass": true
+    },
+    {
+      "scenario": "X6-shaking-and-sliding",
+      "description": "Individual phones deliberately shaken in the hand or slid back and forth on a table.",
+      "devices": 200,
+      "units": 149,
+      "eligibleAtQuake": 0,
+      "quakes": 0,
+      "events": null,
+      "quakesDetectedByLevel": {},
+      "falseEventsByLevel": {},
+      "pickClasses": {
+        "handling": 11,
+        "impulsive": 5,
+        "seismic": 36
+      },
+      "engine": {
+        "PicksAccepted": 36,
+        "PicksRejected": 16,
+        "PicksDuplicate": 0,
+        "PicksUnknownStation": 0,
+        "PicksStale": 0,
+        "PicksDowngraded": 0,
+        "VotesFormed": 33,
+        "EventsCreated": 0,
+        "EventsCorroborated": 0,
+        "EventsConfirmed": 0,
+        "EventsDismissed": 0
+      },
+      "samples": 10427919,
+      "wallSec": 56.438,
+      "pass": true
+    },
+    {
+      "scenario": "X7-prank-countdown-20pct",
+      "description": "20% of 300 established participants shake their phones on a countdown (±1.0 s); the rest stay quiet.",
+      "devices": 300,
+      "units": 184,
+      "eligibleAtQuake": 0,
+      "quakes": 0,
+      "events": [
+        {
+          "id": "NP-20270115-080308-1",
+          "level": "candidate",
+          "outcome": "dismissed",
+          "units": 44,
+          "stations": 47,
+          "log10PAdj": -69.738,
+          "consistency": 0.936,
+          "footprintFraction": 0.308,
+          "quake": -1,
+          "locErrKm": 0,
+          "locUncKm": 11.996,
+          "originErrSec": 0,
+          "latencyCandidate": 0,
+          "latencyCorroborated": 0,
+          "latencyConfirmed": 0,
+          "failedChecks": [
+            "amplitude contradictions"
+          ]
+        }
+      ],
+      "quakesDetectedByLevel": {},
+      "falseEventsByLevel": {
+        "candidate": 1
+      },
+      "pickClasses": {
+        "handling": 8,
+        "impulsive": 9,
+        "seismic": 96,
+        "unsettled": 1
+      },
+      "engine": {
+        "PicksAccepted": 96,
+        "PicksRejected": 18,
+        "PicksDuplicate": 0,
+        "PicksUnknownStation": 0,
+        "PicksStale": 0,
+        "PicksDowngraded": 0,
+        "VotesFormed": 69,
+        "EventsCreated": 1,
+        "EventsCorroborated": 0,
+        "EventsConfirmed": 0,
+        "EventsDismissed": 1
+      },
+      "samples": 11443885,
+      "wallSec": 22.979,
+      "pass": true
+    },
+    {
+      "scenario": "X8-prank-countdown-40pct",
+      "description": "40% of 300 established participants shake their phones on a countdown (±0.5 s); the rest stay quiet.",
+      "devices": 300,
+      "units": 196,
+      "eligibleAtQuake": 0,
+      "quakes": 0,
+      "events": [
+        {
+          "id": "NP-20270115-080316-1",
+          "level": "candidate",
+          "outcome": "dismissed",
+          "units": 87,
+          "stations": 109,
+          "log10PAdj": -162.201,
+          "consistency": 1,
+          "footprintFraction": 0.537,
+          "quake": -1,
+          "locErrKm": 0,
+          "locUncKm": 21.087,
+          "originErrSec": 0,
+          "latencyCandidate": 0,
+          "latencyCorroborated": 0,
+          "latencyConfirmed": 0,
+          "failedChecks": [
+            "amplitude contradictions"
+          ]
+        }
+      ],
+      "quakesDetectedByLevel": {},
+      "falseEventsByLevel": {
+        "candidate": 1
+      },
+      "pickClasses": {
+        "handling": 8,
+        "impulsive": 6,
+        "seismic": 138
+      },
+      "engine": {
+        "PicksAccepted": 138,
+        "PicksRejected": 14,
+        "PicksDuplicate": 0,
+        "PicksUnknownStation": 0,
+        "PicksStale": 0,
+        "PicksDowngraded": 1,
+        "VotesFormed": 111,
+        "EventsCreated": 1,
+        "EventsCorroborated": 0,
+        "EventsConfirmed": 0,
+        "EventsDismissed": 1
+      },
+      "samples": 11199897,
+      "wallSec": 22.53,
+      "pass": true
+    },
+    {
+      "scenario": "X6-shaking-and-sliding",
+      "description": "Individual phones deliberately shaken in the hand or slid back and forth on a table.",
+      "devices": 200,
+      "units": 149,
+      "eligibleAtQuake": 0,
+      "quakes": 0,
+      "events": null,
+      "quakesDetectedByLevel": {},
+      "falseEventsByLevel": {},
+      "pickClasses": {
+        "handling": 11,
+        "impulsive": 5,
+        "seismic": 36
+      },
+      "engine": {
+        "PicksAccepted": 36,
+        "PicksRejected": 16,
+        "PicksDuplicate": 0,
+        "PicksUnknownStation": 0,
+        "PicksStale": 0,
+        "PicksDowngraded": 0,
+        "VotesFormed": 33,
+        "EventsCreated": 0,
+        "EventsCorroborated": 0,
+        "EventsConfirmed": 0,
+        "EventsDismissed": 0
+      },
+      "samples": 10427919,
+      "wallSec": 21.691,
+      "pass": true
+    },
+    {
+      "scenario": "X7-prank-countdown-20pct",
+      "description": "20% of 300 established participants shake their phones on a countdown (±1.0 s); the rest stay quiet.",
+      "devices": 300,
+      "units": 184,
+      "eligibleAtQuake": 0,
+      "quakes": 0,
+      "events": [
+        {
+          "id": "NP-20270115-080308-1",
+          "level": "candidate",
+          "outcome": "dismissed",
+          "units": 44,
+          "stations": 47,
+          "log10PAdj": -69.738,
+          "consistency": 0.936,
+          "footprintFraction": 0.308,
+          "quake": -1,
+          "locErrKm": 0,
+          "locUncKm": 11.996,
+          "originErrSec": 0,
+          "latencyCandidate": 0,
+          "latencyCorroborated": 0,
+          "latencyConfirmed": 0,
+          "failedChecks": [
+            "amplitude contradictions"
+          ]
+        }
+      ],
+      "quakesDetectedByLevel": {},
+      "falseEventsByLevel": {
+        "candidate": 1
+      },
+      "pickClasses": {
+        "handling": 8,
+        "impulsive": 9,
+        "seismic": 96,
+        "unsettled": 1
+      },
+      "engine": {
+        "PicksAccepted": 96,
+        "PicksRejected": 18,
+        "PicksDuplicate": 0,
+        "PicksUnknownStation": 0,
+        "PicksStale": 0,
+        "PicksDowngraded": 0,
+        "VotesFormed": 69,
+        "EventsCreated": 1,
+        "EventsCorroborated": 0,
+        "EventsConfirmed": 0,
+        "EventsDismissed": 1
+      },
+      "samples": 11443885,
+      "wallSec": 24.126,
+      "pass": true
+    },
+    {
+      "scenario": "X8-prank-countdown-40pct",
+      "description": "40% of 300 established participants shake their phones on a countdown (±0.5 s); the rest stay quiet.",
+      "devices": 300,
+      "units": 196,
+      "eligibleAtQuake": 0,
+      "quakes": 0,
+      "events": [
+        {
+          "id": "NP-20270115-080316-1",
+          "level": "candidate",
+          "outcome": "dismissed",
+          "units": 87,
+          "stations": 109,
+          "log10PAdj": -162.201,
+          "consistency": 1,
+          "footprintFraction": 0.537,
+          "quake": -1,
+          "locErrKm": 0,
+          "locUncKm": 21.087,
+          "originErrSec": 0,
+          "latencyCandidate": 0,
+          "latencyCorroborated": 0,
+          "latencyConfirmed": 0,
+          "failedChecks": [
+            "amplitude contradictions"
+          ]
+        }
+      ],
+      "quakesDetectedByLevel": {},
+      "falseEventsByLevel": {
+        "candidate": 1
+      },
+      "pickClasses": {
+        "handling": 8,
+        "impulsive": 6,
+        "seismic": 138
+      },
+      "engine": {
+        "PicksAccepted": 138,
+        "PicksRejected": 14,
+        "PicksDuplicate": 0,
+        "PicksUnknownStation": 0,
+        "PicksStale": 0,
+        "PicksDowngraded": 1,
+        "VotesFormed": 111,
+        "EventsCreated": 1,
+        "EventsCorroborated": 0,
+        "EventsConfirmed": 0,
+        "EventsDismissed": 1
+      },
+      "samples": 11199897,
+      "wallSec": 23.41,
+      "pass": true
+    }
+  ]
+}

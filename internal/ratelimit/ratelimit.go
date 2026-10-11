@@ -8,9 +8,7 @@ package ratelimit
 import (
 	"context"
 	"math"
-	"net"
 	"net/http"
-	"strings"
 	"sync"
 	"time"
 )
@@ -108,38 +106,16 @@ func (l *Limiter) Run(ctx context.Context) {
 	}
 }
 
-// Middleware rejects a request with 429 Too Many Requests once its client
-// IP exceeds the configured rate, otherwise passes it through unchanged.
-//
-// Client IP is read from X-Forwarded-For when present (the first hop, i.e.
-// the original client — everything to its right was appended by trusted
-// proxies), falling back to the raw connection's RemoteAddr. Trusting
-// X-Forwarded-For is only safe when this server sits behind a reverse proxy
-// that sets it itself (Caddy/Nginx, per the deployment's Docs) and is not
-// directly reachable from the internet on its own port — otherwise a client
-// could forge the header to dodge its own limit or frame another IP.
-func (l *Limiter) Middleware(next http.Handler) http.Handler {
+// Middleware rejects a request with 429 Too Many Requests once the key
+// returned by keyOf (normally the trusted-proxy-aware client IP, see
+// security.ClientIP) exceeds the configured rate.
+func (l *Limiter) Middleware(keyOf func(*http.Request) string, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		key := clientIP(r)
-		if !l.Allow(key) {
+		if !l.Allow(keyOf(r)) {
 			w.Header().Set("Retry-After", "1")
-			http.Error(w, "rate limit exceeded: max 5 requests/second per client", http.StatusTooManyRequests)
+			http.Error(w, "rate limit exceeded", http.StatusTooManyRequests)
 			return
 		}
 		next.ServeHTTP(w, r)
 	})
-}
-
-func clientIP(r *http.Request) string {
-	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
-		if i := strings.IndexByte(xff, ','); i != -1 {
-			return strings.TrimSpace(xff[:i])
-		}
-		return strings.TrimSpace(xff)
-	}
-	host, _, err := net.SplitHostPort(r.RemoteAddr)
-	if err != nil {
-		return r.RemoteAddr
-	}
-	return host
 }
