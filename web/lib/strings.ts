@@ -2,7 +2,7 @@
 export type Lang = "en" | "ru";
 
 const en = {
-  nav: { network: "Network", events: "Events", learn: "How it works", privacy: "Privacy", contributors: "Contributors", join: "Add my phone", joinShort: "Join", yours: "Your phone" },
+  nav: { app: "Android app", network: "Network", events: "Events", learn: "How it works", privacy: "Privacy", contributors: "Contributors", join: "Add my phone", joinShort: "Join", yours: "Your phone" },
   footer: {
     disclaimer:
       "NE-PULSE is an experimental research network. It is not an official earthquake warning service. For warnings and safety instructions follow your national seismological and emergency agencies.",
@@ -195,11 +195,16 @@ const en = {
     nameNoteMinor: "First name and the first letter of your surname is enough. It goes on the public list of contributors and into the paper’s acknowledgements once your phone has listened for an hour. Leave empty to stay anonymous.",
     classBad: "This class code is not registered. Check it with the person who sent you the link.",
     title: "Add your phone to the network",
-    lead: "Takes about a minute. Works best on a phone that can stay plugged in on a table.",
+    lead: "One minute. Then leave the phone on the charger, face up, on a table.",
     inApp: "You opened this inside {app}.",
     inAppHow: "In-app browsers often block motion sensors. Tap ⋯ or ⋮ and choose Open in browser (Safari or Chrome), then join there.",
     https: "This page is not on HTTPS, so browsers will not share motion data. Open it via https://.",
     step1: "What you share",
+    shareShort: "Only your phone's shaking and its 1 km area are sent, while this page is open. No phone number, email or account.",
+    appT: "Best on Android: the app",
+    appD: "Install once, tap Start, and it keeps listening with the screen off, all night, every night.",
+    appBtn: "Get the Android app",
+    orWeb: "or use this page below (it must stay open)",
     share1: "Raw accelerometer readings, only while the NE-PULSE page is open on your screen.",
     share2: "The 1 km square you are in. Your phone rounds its position before sending it.",
     share3: "A random ID stored on this phone. No phone number, email or account; your name only if you choose to add it below.",
@@ -613,7 +618,7 @@ const en = {
 };
 
 const ru: typeof en = {
-  nav: { network: "Сеть", events: "События", learn: "Как это работает", privacy: "Приватность", contributors: "Участники", join: "Подключить телефон", joinShort: "Подключить", yours: "Мой телефон" },
+  nav: { app: "Приложение", network: "Сеть", events: "События", learn: "Как это работает", privacy: "Приватность", contributors: "Участники", join: "Подключить телефон", joinShort: "Подключить", yours: "Мой телефон" },
   footer: {
     disclaimer:
       "NE-PULSE — экспериментальная исследовательская сеть, а не официальная служба предупреждения о землетрясениях. Предупреждения и инструкции по безопасности получайте от национальной сейсмологической службы и МЧС.",
@@ -806,11 +811,16 @@ const ru: typeof en = {
     nameNoteMinor: "Достаточно имени и первой буквы фамилии. Оно появится в публичном списке участников и в благодарностях научной работы, когда телефон проработает час. Оставьте пустым, чтобы участвовать анонимно.",
     classBad: "Такой код не зарегистрирован. Уточните его у того, кто прислал ссылку.",
     title: "Подключите телефон к сети",
-    lead: "Это займёт около минуты. Лучше всего подходит телефон, который может лежать на столе на зарядке.",
+    lead: "Одна минута. Потом оставьте телефон на зарядке экраном вверх на столе.",
     inApp: "Вы открыли страницу внутри {app}.",
     inAppHow: "Встроенные браузеры часто блокируют датчики движения. Нажмите ⋯ или ⋮ и выберите «Открыть в браузере» (Safari или Chrome), затем подключитесь там.",
     https: "Страница открыта не по HTTPS, поэтому браузер не передаст данные о движении. Откройте её через https://.",
     step1: "Что вы передаёте",
+    shareShort: "Отправляются только колебания телефона и его район (1 км), пока эта страница открыта. Без номера, почты и аккаунта.",
+    appT: "Лучше на Android: приложение",
+    appD: "Установите один раз, нажмите «Старт» — и телефон слушает с выключенным экраном, всю ночь, каждую ночь.",
+    appBtn: "Скачать приложение для Android",
+    orWeb: "или используйте эту страницу ниже (её нужно держать открытой)",
     share1: "Показания акселерометра — только пока страница NE-PULSE открыта на экране.",
     share2: "Квадрат 1 км, где вы находитесь. Телефон округляет координаты до отправки.",
     share3: "Случайный идентификатор на этом телефоне. Без номера, почты и аккаунта; имя — только если вы сами добавите его ниже.",

@@ -20,6 +20,7 @@ export default function SiteNav() {
   const [joined, setJoined] = useState(false);
   useEffect(() => setJoined(!!storage.creds()), [path]);
   const links = [
+    { href: "/app", label: t("nav.app") },
     { href: "/network", label: t("nav.network") },
     { href: "/events", label: t("nav.events") },
     { href: "/how", label: t("nav.learn") },

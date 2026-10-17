@@ -54,6 +54,7 @@ export default function Join() {
   const [inApp, setInApp] = useState<string | null>(null);
   const [secure, setSecure] = useState(true);
   const [computer, setComputer] = useState(false);
+  const [android, setAndroid] = useState(false);
   const [copied, setCopied] = useState(false);
   function copyLink() {
     navigator.clipboard?.writeText(window.location.href).then(() => setCopied(true)).catch(() => {});
@@ -69,6 +70,7 @@ export default function Join() {
     setInApp(inAppBrowser());
     setSecure(window.isSecureContext);
     setComputer(looksLikeComputer());
+    setAndroid(/Android/i.test(navigator.userAgent));
     const l = storage.location();
     if (l && l.grid === LOC_GRID_KM) {
       setCell({ row: l.row, col: l.col });
@@ -150,6 +152,16 @@ export default function Join() {
         </Link>
       )}
 
+      {android && (
+        <div className="mt-6 rounded-2xl border border-cyan/50 bg-cyan/5 p-5">
+          <div className="text-xl font-semibold text-ink">{t("join.appT")}</div>
+          <p className="mt-1 text-lg text-ink-2">{t("join.appD")}</p>
+          <Link href="/app" className="btn btn-primary mt-4 flex w-full justify-center !min-h-[60px] text-lg">
+            {t("join.appBtn")}
+          </Link>
+          <p className="mt-3 text-center text-sm text-ink-3">{t("join.orWeb")}</p>
+        </div>
+      )}
       {inApp && (
         <div className="mt-6 border border-warn/50 bg-warn/5 p-4 text-sm text-ink-2">
           <strong className="text-warn">{t("join.inApp", { app: inApp })}</strong> {t("join.inAppHow")}
@@ -177,12 +189,7 @@ export default function Join() {
           <StepHead n={1} title={t("join.step1")} active={step === "consent"} done={step !== "consent"} />
           {step === "consent" && (
             <div className="mt-4 grid gap-4">
-              <ul className="grid gap-2 text-ink-2">
-                <li>• {t("join.share1")}</li>
-                <li>• {t("join.share2")}</li>
-                <li>• {t("join.share3")}</li>
-                <li>• {t("join.share4")}</li>
-              </ul>
+              <p className="text-lg text-ink-2">{t("join.shareShort")}</p>
               <label className="flex items-start gap-3 text-ink">
                 <input id="consent" type="checkbox" className="mt-1 h-5 w-5 accent-[var(--trace)]" checked={agreed} onChange={(e) => setAgreed(e.target.checked)} />
                 <span>
