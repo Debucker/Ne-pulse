@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">NE-PULSE</string>
+    <string name="notif_channel">Listening</string>
+
+    <string name="st_off">Off</string>
+    <string name="st_listening">Listening</string>
+    <string name="st_warmup">Getting ready</string>
+    <string name="st_moving">Moving</string>
+    <string name="st_connecting">Connecting</string>
+    <string name="st_offline">No internet</string>
+    <string name="st_nolocation">Area needed</string>
+    <string name="st_nosensor">No sensor</string>
+    <string name="st_locating">Finding your area…</string>
+
+    <string name="dt_off">Tap Start. Then put the phone on the charger, face up, and forget about it.</string>
+    <string name="dt_listening">All good. You can lock the screen and leave it.</string>
+    <string name="dt_warmup">Leave the phone lying still. It starts in about a minute.</string>
+    <string name="dt_moving">Put the phone down on a table and leave it.</string>
+    <string name="dt_connecting">Connecting to the network…</string>
+    <string name="dt_offline">Waiting for the internet. It reconnects by itself.</string>
+    <string name="dt_nolocation">Tap Stop, then Start, and allow your area once.</string>
+    <string name="dt_nosensor">This phone has no motion sensor, so it cannot take part.</string>
+
+    <string name="btn_start">Start</string>
+    <string name="btn_stop">Stop</string>
+    <string name="keep">Keep listening</string>
+    <string name="stop_confirm">Stop listening? Your phone helps the most when it stays on.</string>
+    <string name="today">Today: %1$s h · in total: %2$s h</string>
+
+    <string name="consent_title">Join the earthquake network</string>
+    <string name="consent_text">Your phone will record its own shaking and send it to the NE-PULSE research network.\n\nNo name, no phone number, no account. Your area is rounded to 1 km.\n\nYou can stop and delete everything at any time.</string>
+    <string name="consent_ok">I agree</string>
+    <string name="cancel">Cancel</string>
+
+    <string name="loc_needed">NE-PULSE needs to know your area once (rounded to 1 km) so it can tell where shaking comes from.</string>
+    <string name="loc_off">Turn on location for a moment so we can find your area. You can turn it off again afterwards.</string>
+    <string name="loc_fail">Could not find your area. Go near a window or turn on Wi-Fi, then try again.</string>
+    <string name="try_again">Try again</string>
+    <string name="open_settings">Open settings</string>
+
+    <string name="battery_title">One last step</string>
+    <string name="battery_text">Allow NE-PULSE to keep running in the background, so the phone does not stop it at night.</string>
+    <string name="allow">Allow</string>
+    <string name="later">Later</string>
+
+    <string name="link_class">Class code</string>
+    <string name="link_class_set">Class: %1$s</string>
+    <string name="link_help">Help</string>
+    <string name="link_privacy">Privacy</string>
+    <string name="class_title">Class code</string>
+    <string name="class_text">Only if someone gave you one. Leave empty otherwise.</string>
+    <string name="save">Save</string>
+    <string name="class_saved">Saved.</string>
+    <string name="class_bad">This code does not exist. Check it and try again.</string>
+    <string name="class_offline">No connection. Try again in a moment.</string>
+</resources>

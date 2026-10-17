@@ -4,7 +4,9 @@ $run = Join-Path $PSScriptRoot 'run-night.ps1'
 $pidFile = Join-Path $PSScriptRoot 'supervisor.pid'
 if (Test-Path $pidFile) {
   $old = Get-Content $pidFile
-  if (Get-Process -Id $old -ErrorAction SilentlyContinue) { Write-Output "Already running (pid $old)."; exit 0 }
+  # After a reboot the old pid may belong to another program.
+  $p = Get-Process -Id $old -ErrorAction SilentlyContinue
+  if ($p -and $p.ProcessName -eq 'powershell') { Write-Output "Already running (pid $old)."; exit 0 }
 }
 Remove-Item (Join-Path $PSScriptRoot 'STOP') -ErrorAction SilentlyContinue
 Start-Process powershell -ArgumentList "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$run`"" -WindowStyle Hidden

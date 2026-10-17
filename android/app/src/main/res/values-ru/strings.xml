@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="notif_channel">Работа в фоне</string>
+
+    <string name="st_off">Выключено</string>
+    <string name="st_listening">Слушает</string>
+    <string name="st_warmup">Подготовка</string>
+    <string name="st_moving">В движении</string>
+    <string name="st_connecting">Подключение</string>
+    <string name="st_offline">Нет интернета</string>
+    <string name="st_nolocation">Нужен район</string>
+    <string name="st_nosensor">Нет датчика</string>
+    <string name="st_locating">Определяем район…</string>
+
+    <string name="dt_off">Нажмите «Старт». Потом поставьте телефон на зарядку экраном вверх и забудьте о нём.</string>
+    <string name="dt_listening">Всё работает. Можно заблокировать экран и оставить телефон.</string>
+    <string name="dt_warmup">Оставьте телефон лежать неподвижно. Начнёт примерно через минуту.</string>
+    <string name="dt_moving">Положите телефон на стол и не трогайте.</string>
+    <string name="dt_connecting">Подключаемся к сети…</string>
+    <string name="dt_offline">Ждём интернет. Подключится сам.</string>
+    <string name="dt_nolocation">Нажмите «Стоп», затем «Старт» и один раз разрешите определить район.</string>
+    <string name="dt_nosensor">В этом телефоне нет датчика движения, он не может участвовать.</string>
+
+    <string name="btn_start">Старт</string>
+    <string name="btn_stop">Стоп</string>
+    <string name="keep">Пусть слушает</string>
+    <string name="stop_confirm">Остановить? Телефон помогает больше всего, когда он всегда включён.</string>
+    <string name="today">Сегодня: %1$s ч · всего: %2$s ч</string>
+
+    <string name="consent_title">Подключиться к сети землетрясений</string>
+    <string name="consent_text">Телефон будет записывать собственные колебания и отправлять их в исследовательскую сеть NE-PULSE.\n\nБез имени, номера и аккаунта. Район округляется до 1 км.\n\nОстановить и удалить всё можно в любой момент.</string>
+    <string name="consent_ok">Согласен(на)</string>
+    <string name="cancel">Отмена</string>
+
+    <string name="loc_needed">NE-PULSE нужно один раз узнать ваш район (с точностью до 1 км), чтобы понимать, откуда идут толчки.</string>
+    <string name="loc_off">Включите геолокацию на минуту, чтобы определить район. Потом её можно выключить.</string>
+    <string name="loc_fail">Не удалось определить район. Подойдите к окну или включите Wi-Fi и попробуйте снова.</string>
+    <string name="try_again">Ещё раз</string>
+    <string name="open_settings">Открыть настройки</string>
+
+    <string name="battery_title">Последний шаг</string>
+    <string name="battery_text">Разрешите NE-PULSE работать в фоне, чтобы телефон не отключал его ночью.</string>
+    <string name="allow">Разрешить</string>
+    <string name="later">Позже</string>
+
+    <string name="link_class">Код класса</string>
+    <string name="link_class_set">Класс: %1$s</string>
+    <string name="link_help">Помощь</string>
+    <string name="link_privacy">Приватность</string>
+    <string name="class_title">Код класса</string>
+    <string name="class_text">Только если вам его дали. Иначе оставьте пустым.</string>
+    <string name="save">Сохранить</string>
+    <string name="class_saved">Сохранено.</string>
+    <string name="class_bad">Такого кода нет. Проверьте и попробуйте снова.</string>
+    <string name="class_offline">Нет связи. Попробуйте чуть позже.</string>
+</resources>
