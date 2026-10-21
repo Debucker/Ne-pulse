@@ -51,6 +51,10 @@ function EN() {
             it on the phone page at any time; leaving the network deletes it. If you joined with a friend&apos;s invite link, we note who invited
             you so they are credited; nothing else about you is shared with them.
           </li>
+          <li>
+            <strong>Night team (only if you sign up after the phone test).</strong> Your Telegram username, phone type, age group and language,
+            used only to add you to the volunteers&apos; Telegram group. It is stored apart from your test answers and deleted after the study.
+          </li>
         </ul>
         <h2>Not collected</h2>
         <ul>
@@ -133,6 +137,10 @@ function RU() {
             когда телефон проработал час. Хранится отдельно от записей движения и никогда в них не попадает. Изменить или удалить имя можно на
             странице телефона в любой момент; выход из сети удаляет его. Если вы подключились по ссылке друга, мы отмечаем, кто вас пригласил,
             чтобы засчитать это ему; больше ничего о вас ему не сообщается.
+          </li>
+          <li>
+            <strong>Ночная команда (только если вы записались после теста телефона).</strong> Ваш username в Telegram, тип телефона, возрастная
+            группа и язык — только чтобы добавить вас в группу участников. Хранится отдельно от ответов теста и удаляется после исследования.
           </li>
         </ul>
         <h2>Не собирается</h2>

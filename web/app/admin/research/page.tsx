@@ -44,6 +44,7 @@ type Survey = {
   meta?: Record<string, unknown>;
 };
 const SURVEY_KEYS = ["age", "surface", "night", "charging", "storey", "overnight", "oldphone", "felt", "floor"];
+type Volunteer = { handle: string; created: number; platform: string; age: string; lang: string };
 type Summary = { night: string; phones: number; eligible: number; flagged: number; hours: number };
 type Research = { cohort: string; joined: number; minHours: number; tonight: string; nights: Summary[]; rows: Row[]; recordingBytes: number; recordingFull: boolean };
 
@@ -65,6 +66,7 @@ export default function ResearchAdmin() {
   const [err, setErr] = useState<string | null>(null);
   const [people, setPeople] = useState<Person[]>([]);
   const [surveys, setSurveys] = useState<Survey[]>([]);
+  const [vols, setVols] = useState<Volunteer[]>([]);
 
   useEffect(() => {
     try {
@@ -88,6 +90,8 @@ export default function ResearchAdmin() {
       if (c.ok) setPeople((await c.json()).people ?? []);
       const sv = await fetch(`${API_URL}/api/admin/survey`, { headers: { Authorization: `Bearer ${token}` }, cache: "no-store" });
       if (sv.ok) setSurveys((await sv.json()).responses ?? []);
+      const vo = await fetch(`${API_URL}/api/admin/volunteers`, { headers: { Authorization: `Bearer ${token}` }, cache: "no-store" });
+      if (vo.ok) setVols((await vo.json()).volunteers ?? []);
       setErr(null);
     } catch (e) {
       setErr((e as Error).message);
@@ -288,6 +292,63 @@ export default function ResearchAdmin() {
                   <tr>
                     <td colSpan={15} className="p-4 text-ink-3">
                       No responses yet. Share ne-pulse.com/test.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="mt-8 flex flex-wrap items-end justify-between gap-3">
+            <h2 className="text-lg font-semibold">
+              Night team volunteers <span className="text-sm text-ink-3">({vols.length})</span>
+            </h2>
+            <div className="flex gap-2">
+              <button className="btn btn-ghost !min-h-[36px] text-sm" onClick={() => navigator.clipboard?.writeText(vols.map((v) => "@" + v.handle).join(" "))}>
+                Copy all usernames
+              </button>
+              <button
+                className="btn btn-ghost !min-h-[36px] text-sm"
+                onClick={() =>
+                  download(
+                    "ne-pulse-night-team.csv",
+                    ["handle,platform,age,lang,joined_unix", ...vols.map((v) => ["@" + v.handle, v.platform, v.age, v.lang, Math.round(v.created)].join(","))].join(String.fromCharCode(10)),
+                  )
+                }
+              >
+                Export CSV
+              </button>
+            </div>
+          </div>
+          <div className="mt-2 overflow-x-auto rounded-xl border border-rule">
+            <table className="w-full text-sm">
+              <thead className="bg-panel text-left text-ink-3">
+                <tr>
+                  {["Telegram", "Phone", "Age", "Language", "Joined"].map((h) => (
+                    <th key={h} className="label p-2.5 font-normal">
+                      {h}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {vols.map((v) => (
+                  <tr key={v.handle} className="border-t border-rule">
+                    <td className="p-2.5">
+                      <a href={`https://t.me/${v.handle}`} target="_blank" rel="noreferrer" className="text-cyan underline underline-offset-2">
+                        @{v.handle}
+                      </a>
+                    </td>
+                    <td className="mono p-2.5">{v.platform}</td>
+                    <td className="mono p-2.5">{v.age || "–"}</td>
+                    <td className="mono p-2.5">{v.lang}</td>
+                    <td className="mono p-2.5">{new Date(v.created * 1000).toLocaleString()}</td>
+                  </tr>
+                ))}
+                {!vols.length && (
+                  <tr>
+                    <td colSpan={5} className="p-4 text-ink-3">
+                      Nobody yet. People who answer “Yes” to staying overnight are asked for their Telegram username.
                     </td>
                   </tr>
                 )}

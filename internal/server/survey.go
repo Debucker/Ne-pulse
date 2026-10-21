@@ -19,6 +19,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
 	"sync"
@@ -353,4 +354,53 @@ func nonEmpty(j string) string {
 		return "{}"
 	}
 	return j
+}
+
+var tgHandle = regexp.MustCompile(`^[A-Za-z][A-Za-z0-9_]{3,31}$`)
+
+// POST /api/v1/volunteer {handle, platform, age, lang}: joins the night team.
+func (s *Server) handleVolunteer(w http.ResponseWriter, r *http.Request) {
+	if !s.surveyLimiter().Allow(s.cfg.ClientIP.Key(r)) {
+		errJSON(w, http.StatusTooManyRequests, "too many requests; try again later")
+		return
+	}
+	var req struct {
+		Handle, Platform, Age, Lang string
+	}
+	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1024)).Decode(&req); err != nil {
+		errJSON(w, 400, "invalid request")
+		return
+	}
+	h := strings.TrimSpace(req.Handle)
+	h = strings.TrimPrefix(h, "https://t.me/")
+	h = strings.TrimPrefix(h, "t.me/")
+	h = strings.TrimPrefix(h, "@")
+	if !tgHandle.MatchString(h) {
+		errJSON(w, 400, "invalid username")
+		return
+	}
+	age := ""
+	if oneOf(req.Age, surveyChoices["age"]) {
+		age = req.Age
+	}
+	lang := "en"
+	if req.Lang == "ru" {
+		lang = "ru"
+	}
+	v := store.Volunteer{Handle: h, Created: float64(time.Now().Unix()), Platform: protocol.ValidPlatform(req.Platform), Age: age, Lang: lang}
+	if err := s.st.AddVolunteer(r.Context(), v); err != nil {
+		errJSON(w, 503, "could not save; please try again")
+		return
+	}
+	writeJSON(w, 201, map[string]string{"handle": h})
+}
+
+func (s *Server) handleAdminVolunteers(w http.ResponseWriter, r *http.Request) {
+	list, err := s.st.Volunteers(r.Context())
+	if err != nil {
+		errJSON(w, 503, "unavailable")
+		return
+	}
+	w.Header().Set("Cache-Control", "no-store")
+	writeJSON(w, 200, map[string]any{"volunteers": list})
 }

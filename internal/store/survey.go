@@ -73,3 +73,49 @@ func (s *Store) Surveys(ctx context.Context) ([]SurveyResponse, error) {
 	}
 	return out, rows.Err()
 }
+
+// Volunteer is someone from the phone test who wants to join a night of
+// recording. Kept apart from the survey answers so those stay anonymous.
+type Volunteer struct {
+	Handle   string  `json:"handle"` // Telegram username, without @
+	Created  float64 `json:"created"`
+	Platform string  `json:"platform"`
+	Age      string  `json:"age"`
+	Lang     string  `json:"lang"`
+}
+
+const volunteerSchema = `CREATE TABLE IF NOT EXISTS volunteers (
+  handle TEXT PRIMARY KEY,
+  created REAL NOT NULL,
+  platform TEXT NOT NULL DEFAULT '',
+  age TEXT NOT NULL DEFAULT '',
+  lang TEXT NOT NULL DEFAULT ''
+)`
+
+// AddVolunteer stores (or refreshes) a volunteer.
+func (s *Store) AddVolunteer(ctx context.Context, v Volunteer) error {
+	return s.Sync(ctx, func(tx *sql.Tx) error {
+		_, err := tx.Exec(`INSERT INTO volunteers(handle, created, platform, age, lang) VALUES(?,?,?,?,?)
+			ON CONFLICT(handle) DO UPDATE SET created=excluded.created, platform=excluded.platform, age=excluded.age, lang=excluded.lang`,
+			v.Handle, v.Created, v.Platform, v.Age, v.Lang)
+		return err
+	})
+}
+
+// Volunteers lists them, oldest first.
+func (s *Store) Volunteers(ctx context.Context) ([]Volunteer, error) {
+	rows, err := s.db.QueryContext(ctx, `SELECT handle, created, platform, age, lang FROM volunteers ORDER BY created`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []Volunteer{}
+	for rows.Next() {
+		var v Volunteer
+		if err := rows.Scan(&v.Handle, &v.Created, &v.Platform, &v.Age, &v.Lang); err != nil {
+			return nil, err
+		}
+		out = append(out, v)
+	}
+	return out, rows.Err()
+}

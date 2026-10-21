@@ -92,6 +92,21 @@ const TEXT = {
     errDenied: "Motion access was refused. Close this page completely, open the link again and tap Allow.",
     errSend: "Could not send. Check the internet and tap the button again.",
     sendAgain: "Send again",
+    teamT: "Join the night team?",
+    teamLead: "You said you would leave your phone on overnight. Here is how it works:",
+    teamPoints: [
+      "I will add you to a Telegram group with the other volunteers.",
+      "We do it together on one night: phone on the charger, on a table, until morning. I explain every step in the group.",
+      "Everyone who takes part gets a certificate of participation in the research.",
+    ],
+    teamLabel: "Your Telegram username",
+    teamPh: "@username",
+    teamHow: "Find it in Telegram › Settings, under your name (it starts with @).",
+    teamNote: "Only used to add you to the group. Stored separately from your test answers and deleted after the study. Under 18? Tell a parent.",
+    teamJoin: "Join the night team",
+    teamSkip: "No thanks",
+    teamBad: "Check the username: letters, numbers and _, at least 5 characters, from Telegram › Settings.",
+    teamOk: "You're on the night team! You'll be added to the Telegram group soon.",
   },
   ru: {
     kicker: "Исследование землетрясений · 1 минута",
@@ -157,10 +172,25 @@ const TEXT = {
     errDenied: "Доступ к датчику запрещён. Полностью закрой страницу, открой ссылку снова и нажми «Разрешить».",
     errSend: "Не удалось отправить. Проверь интернет и нажми кнопку ещё раз.",
     sendAgain: "Отправить ещё раз",
+    teamT: "Присоединишься к ночной команде?",
+    teamLead: "Ты ответил(а), что оставил(а) бы телефон на ночь. Вот как это будет:",
+    teamPoints: [
+      "Я добавлю тебя в группу в Telegram вместе с другими участниками.",
+      "Мы сделаем это вместе в одну ночь: телефон на зарядке, на столе, до утра. Каждый шаг я объясню в группе.",
+      "Все, кто участвует, получат сертификат участника исследования.",
+    ],
+    teamLabel: "Твой username в Telegram",
+    teamPh: "@username",
+    teamHow: "Его можно найти в Telegram › Настройки, под твоим именем (начинается с @).",
+    teamNote: "Нужен только чтобы добавить тебя в группу. Хранится отдельно от ответов теста и удаляется после исследования. Тебе меньше 18? Предупреди родителей.",
+    teamJoin: "Вступить в ночную команду",
+    teamSkip: "Нет, спасибо",
+    teamBad: "Проверь username: буквы, цифры и _, минимум 5 символов, из Telegram › Настройки.",
+    teamOk: "Ты в ночной команде! Скоро тебя добавят в группу в Telegram.",
   },
 };
 
-type Phase = "intro" | "perm" | "place" | "measure" | "hidden" | "questions" | "send" | "result";
+type Phase = "intro" | "perm" | "place" | "measure" | "hidden" | "questions" | "send" | "team" | "result";
 type Result = { measured: boolean; betterThanPct: number; tested: number; detMmi: number };
 type WakeLock = { release: () => Promise<void> };
 
@@ -201,6 +231,9 @@ export default function PhoneTest() {
   const [copied, setCopied] = useState(false);
   const [inApp, setInApp] = useState<string | null>(null);
   const [android, setAndroid] = useState(false);
+  const [handle, setHandle] = useState("");
+  const [teamErr, setTeamErr] = useState(false);
+  const [joined, setJoined] = useState(false);
   const rec = useRef({ t0: 0, dt: [] as number[], x: [] as number[], y: [] as number[], z: [] as number[] });
   const meta = useRef({ restarts: 0, wakeLock: false, settleSec: 0, screenOff: 0 });
   const stopRef = useRef<() => void>(() => {});
@@ -392,6 +425,26 @@ export default function PhoneTest() {
       });
       if (!resp.ok) throw new Error();
       setRes(await resp.json());
+      setPhase(a.overnight === "yes" && !joined ? "team" : "result");
+    } catch {
+      setErr(L.errSend);
+    }
+  }
+
+  async function joinTeam() {
+    const h = handle.trim().replace(/^(https?:\/\/)?t\.me\//, "").replace(/^@/, "");
+    if (!/^[A-Za-z][A-Za-z0-9_]{3,31}$/.test(h)) return setTeamErr(true);
+    setTeamErr(false);
+    try {
+      await backendReady;
+      const r = await fetch(API_URL + "/api/v1/volunteer", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ handle: h, platform: /Android/i.test(navigator.userAgent) ? "android" : isIOS() ? "ios" : "other", age: answers.age ?? "", lang }),
+      });
+      if (r.status === 400) return setTeamErr(true);
+      if (!r.ok) throw new Error();
+      setJoined(true);
       setPhase("result");
     } catch {
       setErr(L.errSend);
@@ -557,8 +610,51 @@ export default function PhoneTest() {
         </div>
       )}
 
+      {phase === "team" && (
+        <div className="min-h-[70vh]">
+          <h1 className="text-3xl font-bold">🌙 {L.teamT}</h1>
+          <p className="mt-4 text-lg text-ink-2">{L.teamLead}</p>
+          <ol className="mt-4 grid gap-3">
+            {L.teamPoints.map((t, i) => (
+              <li key={t} className="flex gap-3 rounded-xl border border-rule p-4 text-lg text-ink">
+                <span className="mono text-cyan">{i + 1}</span>
+                <span>{t}</span>
+              </li>
+            ))}
+          </ol>
+          <label className="mt-6 grid gap-2">
+            <span className="text-lg font-medium text-ink">{L.teamLabel}</span>
+            <input
+              value={handle}
+              onChange={(e) => {
+                setHandle(e.target.value);
+                setTeamErr(false);
+              }}
+              placeholder={L.teamPh}
+              autoCapitalize="none"
+              autoCorrect="off"
+              autoComplete="off"
+              spellCheck={false}
+              maxLength={40}
+              className="h-14 rounded-xl border border-rule-strong bg-ground px-4 text-xl text-ink outline-none focus:border-cyan"
+            />
+            <span className="text-sm text-ink-3">{L.teamHow}</span>
+          </label>
+          {teamErr && <p className="mt-3 text-base text-warn">{L.teamBad}</p>}
+          {err && <p className="mt-3 text-base text-bad">{err}</p>}
+          <button className={`${big} mt-6`} disabled={!handle.trim()} onClick={joinTeam}>
+            {L.teamJoin}
+          </button>
+          <button className="mt-3 w-full py-3 text-lg text-ink-3 underline underline-offset-4" onClick={() => setPhase("result")}>
+            {L.teamSkip}
+          </button>
+          <p className="mt-4 text-sm leading-relaxed text-ink-3">{L.teamNote}</p>
+        </div>
+      )}
+
       {phase === "result" && res && (
         <>
+          {joined && <p className="mb-4 rounded-xl border border-ok/50 bg-ok/10 p-4 text-lg text-ink">✓ {L.teamOk}</p>}
           <div className="glass mt-4 p-6 text-center">
             <div className="label">{L.resultKicker}</div>
             {res.measured ? (
