@@ -1,0 +1,101 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@1,500&family=Manrope:wght@400;600;800&family=IBM+Plex+Mono:wght@500&display=block" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
+<style>
+  :root { --paper: #f4f0e8; --ink: #141414; --soft: #6f6a62; --line: #d9d3c7; --accent: #ff5b3a; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 1080px; height: 1350px; background: var(--paper); overflow: hidden; }
+  body { font-family: Manrope, sans-serif; color: var(--ink); position: relative; }
+  .top { position: absolute; left: 96px; right: 96px; top: 84px; display: flex; justify-content: space-between; align-items: center; }
+  .brand { display: flex; align-items: center; gap: 12px; font-weight: 800; font-size: 26px; letter-spacing: .04em; }
+  .meta { font-family: "IBM Plex Mono"; font-size: 20px; letter-spacing: .14em; color: var(--soft); }
+  .art { position: absolute; left: 0; right: 0; top: 190px; height: 560px; }
+  .copy { position: absolute; left: 96px; right: 96px; top: 790px; }
+  h1 { font-weight: 800; font-size: 92px; line-height: .98; letter-spacing: -0.035em; }
+  h1 em { font-family: "Playfair Display"; font-style: italic; font-weight: 500; letter-spacing: -0.01em; color: var(--accent); }
+  .sub { margin-top: 30px; font-size: 32px; line-height: 1.35; color: var(--soft); max-width: 760px; }
+  .bottom { position: absolute; left: 96px; right: 96px; bottom: 88px; display: flex; justify-content: space-between; align-items: flex-end; }
+  .url { font-weight: 800; font-size: 42px; letter-spacing: -0.02em; }
+  .url span { color: var(--accent); }
+  .fine { margin-top: 10px; font-family: "IBM Plex Mono"; font-size: 18px; letter-spacing: .1em; color: var(--soft); text-transform: uppercase; }
+  .qr svg { display: block; width: 150px; height: 150px; }
+</style>
+</head>
+<body>
+  <div class="top">
+    <div class="brand">
+      <svg width="40" height="40" viewBox="0 0 100 100"><path d="M10 52 H35 L43 26 L55 78 L64 34 L71 52 H90" fill="none" stroke="#141414" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      NE-PULSE
+    </div>
+    <div class="meta" id="meta"></div>
+  </div>
+
+  <!-- A phone lying on a table, quietly listening: the line runs flat
+       across the page and only jumps where it passes through the phone. -->
+  <svg class="art" viewBox="0 0 1080 560" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <clipPath id="screen"><rect x="430" y="70" width="220" height="420" rx="34"/></clipPath>
+    </defs>
+    <ellipse cx="540" cy="512" rx="150" ry="16" fill="#000" opacity=".06"/>
+    <rect x="414" y="54" width="252" height="452" rx="46" fill="#fff" stroke="#141414" stroke-width="6"/>
+    <rect x="510" y="74" width="60" height="12" rx="6" fill="#141414"/>
+    <path id="flat-l" d="M0 280 H414" stroke="#141414" stroke-width="3" fill="none" stroke-linecap="round" opacity=".35"/>
+    <path id="flat-r" d="M666 280 H1080" stroke="#141414" stroke-width="3" fill="none" stroke-linecap="round" opacity=".35"/>
+    <g clip-path="url(#screen)">
+      <path id="wave" fill="none" stroke="#ff5b3a" stroke-width="5" stroke-linejoin="round" stroke-linecap="round"/>
+    </g>
+    <circle cx="540" cy="452" r="7" fill="#ff5b3a"/>
+    <text id="listen" x="540" y="140" text-anchor="middle" font-family="IBM Plex Mono" font-size="17" letter-spacing="3" fill="#6f6a62"></text>
+  </svg>
+
+  <div class="copy">
+    <h1 id="h1"></h1>
+    <p class="sub" id="sub"></p>
+  </div>
+
+  <div class="bottom">
+    <div>
+      <div class="url">ne-pulse.com/<span>test</span></div>
+      <div class="fine" id="fine"></div>
+    </div>
+    <div class="qr" id="qr"></div>
+  </div>
+
+<script>
+  const T = {
+    en: { meta: "RESEARCH · 2026", listen: "LISTENING", h1: "Your phone can<br><em>feel</em> earthquakes.", sub: "Find out how sensitive it is. 60 seconds, for a real research project.", fine: "Anonymous · no sign-up" },
+    ru: { meta: "ИССЛЕДОВАНИЕ · 2026", listen: "СЛУШАЕТ", h1: "Твой телефон<br><em>чувствует</em> землетрясения.", sub: "Узнай, насколько он чувствителен. 60 секунд — для настоящего исследования.", fine: "Анонимно · без регистрации" },
+  };
+  const lang = new URLSearchParams(location.search).get("lang") === "ru" ? "ru" : "en";
+  const t = T[lang];
+  document.documentElement.lang = lang;
+  for (const k of ["meta", "sub", "fine"]) document.getElementById(k).textContent = t[k];
+  document.getElementById("h1").innerHTML = t.h1;
+  document.getElementById("listen").textContent = t.listen;
+  if (lang === "ru") {
+    document.getElementById("h1").style.fontSize = "80px";
+    document.querySelector(".art").style.top = "150px";
+    document.querySelector(".copy").style.top = "730px";
+  }
+
+  // Inside the phone: quiet, then a little quake, then quiet again.
+  let d = "", s = 11;
+  const rnd = () => ((s = (s * 9301 + 49297) % 233280) / 233280) - 0.5;
+  for (let x = 414; x <= 666; x += 3) {
+    const e = Math.exp(-Math.pow((x - 545) / 34, 2));
+    const y = 280 + rnd() * (4 + 150 * e);
+    d += (x === 414 ? "M" : " L") + x + " " + y.toFixed(1);
+  }
+  document.getElementById("wave").setAttribute("d", d);
+
+  const qr = qrcode(0, "M");
+  qr.addData("https://ne-pulse.com/test");
+  qr.make();
+  document.getElementById("qr").innerHTML = qr.createSvgTag({ cellSize: 5, margin: 0, scalable: true })
+    .replace(/fill="#ffffff"/g, 'fill="transparent"').replace(/fill="#000000"/g, 'fill="#141414"');
+</script>
+</body>
+</html>
