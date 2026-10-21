@@ -25,6 +25,23 @@ type Row = {
   flags?: string[];
 };
 type Person = { name: string; hours: number; nights: number; invited: number; since: number; ref: string; hidden?: boolean; cohort?: string };
+type Survey = {
+  id: string;
+  created: number;
+  platform: string;
+  model: string;
+  lang: string;
+  cohort: string;
+  rateHz: number;
+  noiseMms2: number;
+  resolutionMms2: number;
+  jitterMs: number;
+  stillSec: number;
+  detMmi: number;
+  answers: Record<string, string> | null;
+  file: string;
+};
+const SURVEY_KEYS = ["night", "floor", "overnight", "oldphone", "felt"];
 type Summary = { night: string; phones: number; eligible: number; flagged: number; hours: number };
 type Research = { cohort: string; joined: number; minHours: number; tonight: string; nights: Summary[]; rows: Row[]; recordingBytes: number; recordingFull: boolean };
 
@@ -45,6 +62,7 @@ export default function ResearchAdmin() {
   const [data, setData] = useState<Research | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [people, setPeople] = useState<Person[]>([]);
+  const [surveys, setSurveys] = useState<Survey[]>([]);
 
   useEffect(() => {
     try {
@@ -66,6 +84,8 @@ export default function ResearchAdmin() {
       setData(await r.json());
       const c = await fetch(`${API_URL}/api/admin/credits`, { headers: { Authorization: `Bearer ${token}` }, cache: "no-store" });
       if (c.ok) setPeople((await c.json()).people ?? []);
+      const sv = await fetch(`${API_URL}/api/admin/survey`, { headers: { Authorization: `Bearer ${token}` }, cache: "no-store" });
+      if (sv.ok) setSurveys((await sv.json()).responses ?? []);
       setErr(null);
     } catch (e) {
       setErr((e as Error).message);
@@ -185,6 +205,87 @@ export default function ResearchAdmin() {
                   <tr>
                     <td colSpan={6} className="p-4 text-ink-3">
                       No listening yet. Nights appear as soon as phones lie still.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="mt-8 flex flex-wrap items-end justify-between gap-3">
+            <h2 className="text-lg font-semibold">
+              Phone test (survey) <span className="text-sm text-ink-3">({surveys.length} responses · {surveys.filter((r) => r.noiseMms2 > 0).length} measured)</span>
+            </h2>
+            <button
+              className="btn btn-ghost !min-h-[36px] text-sm"
+              onClick={() =>
+                download(
+                  "ne-pulse-survey.csv",
+                  [
+                    ["id", "created_unix", "platform", "model", "lang", "class", "rate_hz", "noise_mms2", "resolution_mms2", "jitter_ms", "still_sec", "det_mmi", ...SURVEY_KEYS, "file"].join(","),
+                    ...surveys.map((r) =>
+                      [r.id, Math.round(r.created), r.platform, JSON.stringify(r.model), r.lang, r.cohort, r.rateHz, r.noiseMms2, r.resolutionMms2, r.jitterMs, r.stillSec, r.detMmi, ...SURVEY_KEYS.map((k) => r.answers?.[k] ?? ""), r.file].join(","),
+                    ),
+                  ].join(String.fromCharCode(10)),
+                )
+              }
+            >
+              Export survey CSV
+            </button>
+          </div>
+          <div className="mt-2 grid gap-2 sm:grid-cols-5">
+            {SURVEY_KEYS.map((k) => {
+              const tally: Record<string, number> = {};
+              surveys.forEach((r) => {
+                const v = r.answers?.[k];
+                if (v) tally[v] = (tally[v] ?? 0) + 1;
+              });
+              return (
+                <div key={k} className="rounded-xl border border-rule p-3 text-xs">
+                  <div className="label mb-1">{k}</div>
+                  {Object.entries(tally)
+                    .sort((a, b) => b[1] - a[1])
+                    .map(([v, n]) => (
+                      <div key={v} className="mono flex justify-between gap-2">
+                        <span>{v}</span>
+                        <span>{n}</span>
+                      </div>
+                    ))}
+                </div>
+              );
+            })}
+          </div>
+          <div className="mt-2 max-h-[420px] overflow-auto rounded-xl border border-rule">
+            <table className="w-full text-xs">
+              <thead className="sticky top-0 bg-panel text-left text-ink-3">
+                <tr>
+                  {["Time", "Phone", "Rate", "Noise (mm/s²)", "Still s", "Feels from MMI", ...SURVEY_KEYS].map((h) => (
+                    <th key={h} className="label whitespace-nowrap p-2 font-normal">
+                      {h}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {surveys.map((r) => (
+                  <tr key={r.id} className="border-t border-rule">
+                    <td className="mono whitespace-nowrap p-2">{fmtT(r.created)}</td>
+                    <td className="p-2">{r.model || r.platform}</td>
+                    <td className="mono p-2">{r.rateHz ? `${r.rateHz} Hz` : "–"}</td>
+                    <td className="mono p-2">{r.noiseMms2 || "–"}</td>
+                    <td className="mono p-2">{r.stillSec}</td>
+                    <td className="mono p-2">{r.detMmi || "–"}</td>
+                    {SURVEY_KEYS.map((k) => (
+                      <td key={k} className="mono whitespace-nowrap p-2">
+                        {r.answers?.[k] ?? ""}
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+                {!surveys.length && (
+                  <tr>
+                    <td colSpan={11} className="p-4 text-ink-3">
+                      No responses yet. Share ne-pulse.com/test.
                     </td>
                   </tr>
                 )}

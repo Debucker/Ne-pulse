@@ -45,6 +45,8 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/v1/devices/me/credit", s.handleMyCredit)
 	mux.HandleFunc("POST /api/v1/devices/me/credit", s.handleMyCredit)
 	mux.HandleFunc("GET /api/v1/contributors", s.handleContributors)
+	mux.HandleFunc("POST /api/v1/survey", s.handleSurvey)
+	mux.HandleFunc("GET /api/v1/survey/stats", s.handleSurveyStats)
 	mux.HandleFunc("GET /ws/device", s.handleDeviceWS)
 	mux.HandleFunc("GET /ws/public", s.handlePublicWS)
 
@@ -64,6 +66,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/admin/recordings", s.admin(s.handleAdminRecordings))
 	mux.HandleFunc("GET /api/admin/research", s.admin(s.handleAdminResearch))
 	mux.HandleFunc("GET /api/admin/credits", s.admin(s.handleAdminCredits))
+	mux.HandleFunc("GET /api/admin/survey", s.admin(s.handleAdminSurvey))
 	mux.HandleFunc("POST /api/admin/credits/hide", s.admin(s.handleAdminHideCredit))
 	mux.HandleFunc("GET /api/admin/recordings/file", s.admin(s.handleAdminRecordingFile))
 

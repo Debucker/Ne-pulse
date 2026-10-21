@@ -145,6 +145,7 @@ type Server struct {
 	engIn  chan engMsg
 
 	upgrader  websocket.Upgrader
+	survey    surveyState
 	linksOnce sync.Once
 	tl        *telegramLinks
 	sessMu    sync.Mutex

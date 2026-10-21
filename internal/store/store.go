@@ -178,6 +178,10 @@ func Open(path string) (*Store, error) {
 		db.Close()
 		return nil, fmt.Errorf("store: migrate: %w", err)
 	}
+	if _, err := db.Exec(surveySchema); err != nil {
+		db.Close()
+		return nil, fmt.Errorf("store: migrate: %w", err)
+	}
 	// Columns added after the first release. SQLite has no ADD COLUMN IF NOT
 	// EXISTS, so a "duplicate column" error means the migration already ran.
 	for _, m := range []string{
