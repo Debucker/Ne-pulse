@@ -79,7 +79,7 @@ const TEXT = {
     first: "One of the first phones tested",
     feels: "It can feel shaking from intensity {m} ({w}).",
     mmiWords: ["", "people don't feel it", "people don't feel it", "like a truck passing outside", "felt indoors by many people", "felt by everyone"],
-    tested: "{n} phones tested so far",
+    tested: "Phones tested so far: {n}",
     thanks: "Thank you! You are now part of the research.",
     notMeasured: "The phone moved too much to measure it, but your answers are saved. You can try again on a table.",
     share: "Send to friends",
