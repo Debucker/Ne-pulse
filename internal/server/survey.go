@@ -240,21 +240,26 @@ func (s *Server) handleSurvey(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Rank among every phone measured so far (lower noise = more sensitive).
+	// Rank against every other phone measured so far (lower noise = more
+	// sensitive). This test itself is not compared with itself.
 	all, _ := s.st.Surveys(r.Context())
-	worse, total := 0, 0
+	worse, others := 0, 0
 	for _, o := range all {
-		if o.NoiseRMS <= 0 {
+		if o.ID == id || o.NoiseRMS <= 0 {
 			continue
 		}
-		total++
+		others++
 		if m.NoiseRMS > 0 && o.NoiseRMS > m.NoiseRMS {
 			worse++
 		}
 	}
 	pct := 0.0
-	if total > 1 && m.NoiseRMS > 0 {
-		pct = math.Round(100 * float64(worse) / float64(total-1))
+	if others > 0 && m.NoiseRMS > 0 {
+		pct = math.Round(100 * float64(worse) / float64(others))
+	}
+	total := others
+	if m.NoiseRMS > 0 {
+		total++
 	}
 	writeJSON(w, 201, map[string]any{"id": id, "measured": m.NoiseRMS > 0, "noiseMms2": math.Round(m.NoiseRMS*10000) / 10,
 		"rateHz": m.RateHz, "stillSec": m.StillSec, "detMmi": m.DetMMI, "betterThanPct": pct, "tested": total})
