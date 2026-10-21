@@ -40,8 +40,10 @@ type Survey = {
   detMmi: number;
   answers: Record<string, string> | null;
   file: string;
+  tester?: string;
+  meta?: Record<string, unknown>;
 };
-const SURVEY_KEYS = ["night", "floor", "overnight", "oldphone", "felt"];
+const SURVEY_KEYS = ["age", "surface", "night", "charging", "storey", "overnight", "oldphone", "felt", "floor"];
 type Summary = { night: string; phones: number; eligible: number; flagged: number; hours: number };
 type Research = { cohort: string; joined: number; minHours: number; tonight: string; nights: Summary[]; rows: Row[]; recordingBytes: number; recordingFull: boolean };
 
@@ -222,9 +224,9 @@ export default function ResearchAdmin() {
                 download(
                   "ne-pulse-survey.csv",
                   [
-                    ["id", "created_unix", "platform", "model", "lang", "class", "rate_hz", "noise_mms2", "resolution_mms2", "jitter_ms", "still_sec", "det_mmi", ...SURVEY_KEYS, "file"].join(","),
+                    ["id", "created_unix", "platform", "model", "lang", "class", "rate_hz", "noise_mms2", "resolution_mms2", "jitter_ms", "still_sec", "det_mmi", ...SURVEY_KEYS, "tester", "restarts", "screen_off", "wake_lock", "file"].join(","),
                     ...surveys.map((r) =>
-                      [r.id, Math.round(r.created), r.platform, JSON.stringify(r.model), r.lang, r.cohort, r.rateHz, r.noiseMms2, r.resolutionMms2, r.jitterMs, r.stillSec, r.detMmi, ...SURVEY_KEYS.map((k) => r.answers?.[k] ?? ""), r.file].join(","),
+                      [r.id, Math.round(r.created), r.platform, JSON.stringify(r.model), r.lang, r.cohort, r.rateHz, r.noiseMms2, r.resolutionMms2, r.jitterMs, r.stillSec, r.detMmi, ...SURVEY_KEYS.map((k) => r.answers?.[k] ?? ""), r.tester ?? "", String(r.meta?.restarts ?? ""), String(r.meta?.screenOff ?? ""), String(r.meta?.wakeLock ?? ""), r.file].join(","),
                     ),
                   ].join(String.fromCharCode(10)),
                 )
@@ -233,7 +235,7 @@ export default function ResearchAdmin() {
               Export survey CSV
             </button>
           </div>
-          <div className="mt-2 grid gap-2 sm:grid-cols-5">
+          <div className="mt-2 grid gap-2 grid-cols-2 sm:grid-cols-4">
             {SURVEY_KEYS.map((k) => {
               const tally: Record<string, number> = {};
               surveys.forEach((r) => {
@@ -284,7 +286,7 @@ export default function ResearchAdmin() {
                 ))}
                 {!surveys.length && (
                   <tr>
-                    <td colSpan={11} className="p-4 text-ink-3">
+                    <td colSpan={15} className="p-4 text-ink-3">
                       No responses yet. Share ne-pulse.com/test.
                     </td>
                   </tr>

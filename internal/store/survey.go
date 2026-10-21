@@ -22,6 +22,8 @@ type SurveyResponse struct {
 	DetMMI     float64 // weakest shaking this phone would trigger on
 	Answers    string  // JSON object of the tap answers
 	File       string  // raw recording, relative to the record dir
+	Tester     string  // random browser id: the same person testing twice
+	Meta       string  // JSON: how the test went
 }
 
 const surveySchema = `CREATE TABLE IF NOT EXISTS surveys (
@@ -44,9 +46,9 @@ const surveySchema = `CREATE TABLE IF NOT EXISTS surveys (
 // AddSurvey stores one response.
 func (s *Store) AddSurvey(ctx context.Context, r SurveyResponse) error {
 	return s.Sync(ctx, func(tx *sql.Tx) error {
-		_, err := tx.Exec(`INSERT INTO surveys(id, created, platform, model, lang, cohort, rate_hz, noise_rms, resolution, jitter_ms, still_sec, det_mmi, answers, file)
-			VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-			r.ID, r.Created, r.Platform, r.Model, r.Lang, r.Cohort, r.RateHz, r.NoiseRMS, r.Resolution, r.JitterMS, r.StillSec, r.DetMMI, r.Answers, r.File)
+		_, err := tx.Exec(`INSERT INTO surveys(id, created, platform, model, lang, cohort, rate_hz, noise_rms, resolution, jitter_ms, still_sec, det_mmi, answers, file, tester, meta)
+			VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+			r.ID, r.Created, r.Platform, r.Model, r.Lang, r.Cohort, r.RateHz, r.NoiseRMS, r.Resolution, r.JitterMS, r.StillSec, r.DetMMI, r.Answers, r.File, r.Tester, r.Meta)
 		return err
 	})
 }
@@ -54,7 +56,7 @@ func (s *Store) AddSurvey(ctx context.Context, r SurveyResponse) error {
 // Surveys lists every response, newest first (automated test submissions,
 // class CITEST, are left out).
 func (s *Store) Surveys(ctx context.Context) ([]SurveyResponse, error) {
-	rows, err := s.db.QueryContext(ctx, `SELECT id, created, platform, model, lang, cohort, rate_hz, noise_rms, resolution, jitter_ms, still_sec, det_mmi, answers, file
+	rows, err := s.db.QueryContext(ctx, `SELECT id, created, platform, model, lang, cohort, rate_hz, noise_rms, resolution, jitter_ms, still_sec, det_mmi, answers, file, tester, meta
 		FROM surveys WHERE cohort <> 'CITEST' ORDER BY created DESC`)
 	if err != nil {
 		return nil, err
@@ -64,7 +66,7 @@ func (s *Store) Surveys(ctx context.Context) ([]SurveyResponse, error) {
 	for rows.Next() {
 		var r SurveyResponse
 		if err := rows.Scan(&r.ID, &r.Created, &r.Platform, &r.Model, &r.Lang, &r.Cohort, &r.RateHz, &r.NoiseRMS, &r.Resolution,
-			&r.JitterMS, &r.StillSec, &r.DetMMI, &r.Answers, &r.File); err != nil {
+			&r.JitterMS, &r.StillSec, &r.DetMMI, &r.Answers, &r.File, &r.Tester, &r.Meta); err != nil {
 			return nil, err
 		}
 		out = append(out, r)

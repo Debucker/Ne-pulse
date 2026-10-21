@@ -35,11 +35,15 @@ const surveyCohort = "SURVEY"
 
 // Allowed answers (anything else is dropped).
 var surveyChoices = map[string][]string{
+	"age":       {"u14", "14-17", "18+"},
+	"surface":   {"table", "floor", "bed", "other"}, // what the phone lay on during the test
 	"night":     {"bedside", "bed", "desk", "floor", "pillow", "other"},
-	"floor":     {"0", "1", "2-3", "4-9", "10+"},
+	"charging":  {"always", "sometimes", "never"}, // on a charger at night
+	"storey":    {"ground", "2", "3-4", "5-9", "10+"}, // floor of home, counted locally (1st = ground)
 	"overnight": {"yes", "maybe", "no"},
 	"oldphone":  {"android", "iphone", "no"},
 	"felt":      {"tashkent", "elsewhere", "no"},
+	"floor":     {"0", "1", "2-3", "4-9", "10+"}, // first version of the page; replaced by storey
 }
 
 type surveyReq struct {
@@ -53,6 +57,8 @@ type surveyReq struct {
 	Y        []float64         `json:"y"`
 	Z        []float64         `json:"z"`
 	Answers  map[string]string `json:"answers"`
+	Tester   string            `json:"tester"` // random id kept in the browser, to spot repeat tests
+	Meta     map[string]any    `json:"meta"`   // how the test went (restarts, screen lock, ...)
 }
 
 // SurveyMeasure is what the server reads from a still recording.
@@ -154,7 +160,7 @@ type surveyState struct {
 }
 
 func (s *Server) surveyLimiter() *ratelimit.Limiter {
-	s.survey.once.Do(func() { s.survey.limit = ratelimit.New(20.0/3600, 20) })
+	s.survey.once.Do(func() { s.survey.limit = ratelimit.New(600.0/3600, 120) })
 	return s.survey.limit
 }
 
@@ -207,7 +213,21 @@ func (s *Server) handleSurvey(w http.ResponseWriter, r *http.Request) {
 	rand.Read(idb)
 	id := hex.EncodeToString(idb)
 	now := time.Now()
-	resp := store.SurveyResponse{ID: id, Created: float64(now.UnixMilli()) / 1000, Platform: protocol.ValidPlatform(req.Platform), Model: model,
+	tester := ""
+	if len(req.Tester) >= 8 && len(req.Tester) <= 40 && strings.Trim(req.Tester, "0123456789abcdef") == "" {
+		tester = req.Tester
+	}
+	meta := map[string]any{}
+	for k, v := range req.Meta {
+		switch x := v.(type) {
+		case float64, bool:
+			if len(k) <= 24 {
+				meta[k] = x
+			}
+		}
+	}
+	mb, _ := json.Marshal(meta)
+	resp := store.SurveyResponse{Tester: tester, Meta: string(mb), ID: id, Created: float64(now.UnixMilli()) / 1000, Platform: protocol.ValidPlatform(req.Platform), Model: model,
 		Lang: lang, Cohort: cohort, RateHz: m.RateHz, NoiseRMS: m.NoiseRMS, Resolution: m.Resolution, JitterMS: m.JitterMS,
 		StillSec: m.StillSec, DetMMI: m.DetMMI, Answers: string(ab)}
 	if s.cfg.RecordDir != "" && n > 0 && cohort != "CITEST" && (s.rec == nil || !s.rec.Full.Load()) {
@@ -309,7 +329,7 @@ func (s *Server) handleAdminSurvey(w http.ResponseWriter, r *http.Request) {
 		json.Unmarshal([]byte(o.Answers), &a)
 		out = append(out, map[string]any{"id": o.ID, "created": o.Created, "platform": o.Platform, "model": o.Model, "lang": o.Lang,
 			"cohort": o.Cohort, "rateHz": o.RateHz, "noiseMms2": math.Round(o.NoiseRMS*10000) / 10, "resolutionMms2": math.Round(o.Resolution*10000) / 10,
-			"jitterMs": o.JitterMS, "stillSec": o.StillSec, "detMmi": o.DetMMI, "answers": a, "file": o.File})
+			"jitterMs": o.JitterMS, "stillSec": o.StillSec, "detMmi": o.DetMMI, "answers": a, "file": o.File, "tester": o.Tester, "meta": json.RawMessage(nonEmpty(o.Meta))})
 	}
 	w.Header().Set("Cache-Control", "no-store")
 	writeJSON(w, 200, map[string]any{"responses": out})
@@ -321,4 +341,11 @@ func surveyMedian(v []float64) float64 {
 	}
 	sort.Float64s(v)
 	return v[len(v)/2]
+}
+
+func nonEmpty(j string) string {
+	if j == "" {
+		return "{}"
+	}
+	return j
 }

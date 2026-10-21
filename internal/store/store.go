@@ -190,6 +190,8 @@ func Open(path string) (*Store, error) {
 		`ALTER TABLE subscribers ADD COLUMN device_id TEXT NOT NULL DEFAULT ''`,
 		`ALTER TABLE subscribers ADD COLUMN nudged REAL NOT NULL DEFAULT 0`,
 		`ALTER TABLE subscribers ADD COLUMN morning TEXT NOT NULL DEFAULT ''`,
+		`ALTER TABLE surveys ADD COLUMN tester TEXT NOT NULL DEFAULT ''`,
+		`ALTER TABLE surveys ADD COLUMN meta TEXT NOT NULL DEFAULT '{}'`,
 	} {
 		if _, err := db.Exec(m); err != nil && !strings.Contains(err.Error(), "duplicate column") {
 			db.Close()
