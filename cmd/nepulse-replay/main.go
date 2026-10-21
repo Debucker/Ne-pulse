@@ -55,7 +55,22 @@ func main() {
 	maxEpi := flag.Float64("max-epi-km", def.MaxEpiKM, "epicentres within this distance of the phones' centre")
 	seed := flag.Int64("seed", 1, "random seed (same seed + data = same result)")
 	out := flag.String("out", "", "output file prefix (default docs/results/replay-<class>-<night>)")
+	surveyDir := flag.String("survey", "", "phone-test recordings folder (bin/recordings/SURVEY): run the phone-test experiment instead")
+	api := flag.String("api", "http://localhost:8080", "-survey: server address to read the survey answers from")
+	token := flag.String("token", os.Getenv("NEPULSE_ADMIN_TOKEN"), "-survey: admin token (or NEPULSE_ADMIN_TOKEN)")
 	flag.Parse()
+	if *surveyDir != "" {
+		k := ints(*ks)
+		if !isFlagSet("ks") {
+			k = replay.DefaultSurveyConfig().Ks
+		}
+		r := *reps
+		if !isFlagSet("reps") {
+			r = replay.DefaultSurveyConfig().Reps
+		}
+		runSurvey(*surveyDir, *api, *token, *out, k, floats(*pgas), r, *seed)
+		return
+	}
 	if *dir == "" {
 		flag.Usage()
 		os.Exit(2)
@@ -116,4 +131,14 @@ func main() {
 	}
 	fmt.Print(rep.Markdown(title))
 	log.Printf("wrote %s.md and %s.json", *out, *out)
+}
+
+func isFlagSet(name string) bool {
+	set := false
+	flag.Visit(func(f *flag.Flag) {
+		if f.Name == name {
+			set = true
+		}
+	})
+	return set
 }
