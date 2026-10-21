@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@600;800&family=Manrope:wght@500;700&family=IBM+Plex+Mono:wght@500&display=block" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 1080px; height: 1350px; background: #05080b; overflow: hidden; }
+  body { font-family: Manrope, sans-serif; color: #eaf1f4; position: relative; }
+  .bg { position: absolute; inset: 0; }
+  .wrap { position: absolute; inset: 0; padding: 84px 84px 72px; display: flex; flex-direction: column; }
+  .top { display: flex; align-items: center; justify-content: space-between; }
+  .brand { display: flex; align-items: center; gap: 16px; font-family: Unbounded; font-weight: 800; font-size: 34px; letter-spacing: 0.02em; }
+  .tag { font-family: "IBM Plex Mono"; font-size: 22px; letter-spacing: 0.14em; color: #38e1ff; border: 2px solid rgba(56,225,255,.45); padding: 10px 18px; border-radius: 999px; }
+  h1 { margin-top: 250px; font-family: Unbounded; font-weight: 800; font-size: 68px; line-height: 1.04; letter-spacing: -0.01em; }
+  h1 em { font-style: normal; color: #38e1ff; }
+  .sub { margin-top: 26px; font-size: 31px; line-height: 1.35; color: rgba(234,241,244,.82); max-width: 860px; }
+  .sub b { color: #fff; }
+  .steps { margin-top: 34px; display: grid; gap: 18px; }
+  .step { display: flex; gap: 22px; align-items: baseline; font-size: 27px; line-height: 1.3; color: rgba(234,241,244,.9); }
+  .step span { font-family: "IBM Plex Mono"; color: #ff7a2f; font-size: 26px; flex: none; }
+  .bottom { margin-top: auto; display: flex; align-items: flex-end; justify-content: space-between; gap: 40px; }
+  .link .label { font-family: "IBM Plex Mono"; font-size: 22px; letter-spacing: .12em; color: rgba(234,241,244,.55); }
+  .link .url { margin-top: 10px; font-family: Unbounded; font-weight: 600; font-size: 30px; color: #fff; white-space: nowrap; }
+  .link .url i { font-style: normal; color: #38e1ff; }
+  .link .fine { margin-top: 14px; font-size: 20px; color: rgba(234,241,244,.55); }
+  .qr { background: #eaf1f4; padding: 16px; border-radius: 22px; flex: none; }
+  .qr svg { display: block; width: 180px; height: 180px; }
+</style>
+</head>
+<body>
+<svg class="bg" viewBox="0 0 1080 1350" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <radialGradient id="glow" cx="50%" cy="28%" r="60%">
+      <stop offset="0" stop-color="#0f3a46" stop-opacity=".9"/>
+      <stop offset="1" stop-color="#05080b" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="trace" x1="0" x2="1">
+      <stop offset="0" stop-color="#38e1ff" stop-opacity=".15"/>
+      <stop offset=".5" stop-color="#38e1ff"/>
+      <stop offset="1" stop-color="#38e1ff" stop-opacity=".15"/>
+    </linearGradient>
+  </defs>
+  <rect width="1080" height="1350" fill="url(#glow)"/>
+  <g id="dots"></g>
+  <path id="seis" fill="none" stroke="url(#trace)" stroke-width="4" stroke-linejoin="round"/>
+</svg>
+
+<div class="wrap">
+  <div class="top">
+    <div class="brand">
+      <svg width="52" height="52" viewBox="0 0 100 100"><path d="M14 52 H37 L44.5 27 L55.5 77 L64.5 35 L70.5 52 H86" fill="none" stroke="#38e1ff" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      NE-PULSE
+    </div>
+    <div class="tag">ИССЛЕДОВАНИЕ · 1 МИНУТА</div>
+  </div>
+
+  <h1>Насколько чувствителен <em>твой телефон?</em></h1>
+  <p class="sub">В каждом телефоне спрятан маленький сейсмометр. <b>Проверь свой за 60 секунд</b> и помоги ответить на настоящий вопрос: сколько смартфонов нужно, чтобы засечь землетрясение?</p>
+
+  <div class="steps">
+    <div class="step"><span>01</span>Открой ссылку в Safari или Chrome</div>
+    <div class="step"><span>02</span>Телефон на столе 30 секунд, потом 8 нажатий</div>
+    <div class="step"><span>03</span>Узнай своё место и вступи в ночную команду за сертификатом</div>
+  </div>
+
+  <div class="bottom">
+    <div class="link">
+      <div class="label">ПРОЙТИ ТЕСТ</div>
+      <div class="url">ne-pulse.com/<i>test</i></div>
+      <div class="fine">Анонимно · без регистрации · ничего не устанавливать</div>
+    </div>
+    <div class="qr" id="qr"></div>
+  </div>
+</div>
+
+<script>
+  // Seismogram across the upper part: quiet, a P arrival, a stronger S burst, decay.
+  (function () {
+    let d = "", seed = 7;
+    const rnd = () => ((seed = (seed * 9301 + 49297) % 233280) / 233280) - 0.5;
+    for (let x = 0; x <= 1080; x += 3) {
+      const p = Math.exp(-Math.pow((x - 430) / 50, 2)) * 40;
+      const s = x > 560 ? Math.exp(-(x - 560) / 160) * 130 * Math.min(1, (x - 560) / 30) : 0;
+      const y = 300 + rnd() * (6 + p + s);
+      d += (x ? " L" : "M") + x + " " + y.toFixed(1);
+    }
+    document.getElementById("seis").setAttribute("d", d);
+    // Phones: a dotted field, some lit.
+    const g = document.getElementById("dots");
+    let s2 = 3;
+    const r2 = () => (s2 = (s2 * 16807) % 2147483647) / 2147483647;
+    for (let i = 0; i < 90; i++) {
+      const x = 40 + r2() * 1000, y = 170 + r2() * 260;
+      const lit = r2() < 0.22;
+      const c = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+      c.setAttribute("cx", x); c.setAttribute("cy", y); c.setAttribute("r", lit ? 5 : 3);
+      c.setAttribute("fill", lit ? "#38e1ff" : "#2a3a42");
+      if (lit) c.setAttribute("opacity", ".85");
+      g.appendChild(c);
+    }
+  })();
+  const qr = qrcode(0, "M");
+  qr.addData("https://ne-pulse.com/test");
+  qr.make();
+  document.getElementById("qr").innerHTML = qr.createSvgTag({ cellSize: 6, margin: 0, scalable: true });
+</script>
+</body>
+</html>
