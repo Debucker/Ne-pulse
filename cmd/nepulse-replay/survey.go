@@ -7,12 +7,14 @@ package main
 // Writes <out>.md (the write-up tables) and <out>.json.
 
 import (
+	"compress/gzip"
 	"encoding/json"
 	"fmt"
 	"log"
 	"math"
 	"net/http"
 	"os"
+	"path/filepath"
 	"sort"
 	"strings"
 	"time"
@@ -87,7 +89,66 @@ func share(rows []surveyRow, key string, vals ...string) (p, lo, hi float64, n i
 	return float64(k) / float64(n), lo, hi, n
 }
 
+// downloadSurvey saves every phone test from the site into dir, in the
+// recording layout the replay code reads (<dir>/<date>/<id>_<HH>.csv.gz).
+func downloadSurvey(api, token, dir string) error {
+	req, _ := http.NewRequest("GET", strings.TrimRight(api, "/")+"/api/admin/survey?raw=1", nil)
+	req.Header.Set("Authorization", "Bearer "+token)
+	resp, err := (&http.Client{Timeout: 5 * time.Minute}).Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != 200 {
+		return fmt.Errorf("download: HTTP %d", resp.StatusCode)
+	}
+	var data struct {
+		Responses []struct {
+			ID       string  `json:"id"`
+			Created  float64 `json:"created"`
+			Platform string  `json:"platform"`
+			Raw      struct {
+				DT, X, Y, Z []float64
+			} `json:"raw"`
+		} `json:"responses"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&data); err != nil {
+		return err
+	}
+	n := 0
+	for _, r := range data.Responses {
+		if len(r.Raw.DT) == 0 {
+			continue
+		}
+		at := time.Unix(int64(r.Created), 0).UTC()
+		p := filepath.Join(dir, at.Format("2006-01-02"), fmt.Sprintf("%s_%02d.csv.gz", r.ID, at.Hour()))
+		if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+			return err
+		}
+		fh, err := os.Create(p)
+		if err != nil {
+			return err
+		}
+		zw := gzip.NewWriter(fh)
+		base := r.Created*1000 - r.Raw.DT[len(r.Raw.DT)-1]
+		fmt.Fprintf(zw, "# NE-PULSE raw accelerometer recording (phone test, lying still)\n# device=%s cohort=SURVEY platform=%s cell_1km=0:0 cell_centre=0,0\n# columns\ntime_utc_ms,x,y,z\n", r.ID, r.Platform)
+		for i := range r.Raw.DT {
+			fmt.Fprintf(zw, "%.1f,%.3f,%.3f,%.3f\n", base+r.Raw.DT[i], r.Raw.X[i], r.Raw.Y[i], r.Raw.Z[i])
+		}
+		zw.Close()
+		fh.Close()
+		n++
+	}
+	log.Printf("downloaded %d phone tests into %s", n, dir)
+	return nil
+}
+
 func runSurvey(dir, api, token, out string, ks []int, pgas []float64, reps int, seed int64) {
+	if strings.HasPrefix(api, "https://") && token != "" {
+		if err := downloadSurvey(api, token, dir); err != nil {
+			log.Fatalf("could not download the phone tests: %v", err)
+		}
+	}
 	files, err := replay.Index(dir)
 	if err != nil {
 		log.Fatal(err)

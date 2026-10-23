@@ -56,7 +56,7 @@ func main() {
 	seed := flag.Int64("seed", 1, "random seed (same seed + data = same result)")
 	out := flag.String("out", "", "output file prefix (default docs/results/replay-<class>-<night>)")
 	surveyDir := flag.String("survey", "", "phone-test recordings folder (bin/recordings/SURVEY): run the phone-test experiment instead")
-	api := flag.String("api", "http://localhost:8080", "-survey: server address to read the survey answers from")
+	api := flag.String("api", "https://www.ne-pulse.com", "-survey: site to download the phone tests and answers from")
 	token := flag.String("token", os.Getenv("NEPULSE_ADMIN_TOKEN"), "-survey: admin token (or NEPULSE_ADMIN_TOKEN)")
 	flag.Parse()
 	if *surveyDir != "" {
