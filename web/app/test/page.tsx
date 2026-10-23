@@ -10,6 +10,7 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { ArrowLeft, Hand, ListChecks, Share2, RotateCcw, Smartphone, Timer, Trophy } from "lucide-react";
 import { inAppBrowser, isIOS, requestMotionPermission } from "@/lib/sensor/client";
+import { API_URL, backendReady } from "@/lib/config";
 import { useT } from "@/lib/i18n";
 
 const SECONDS = 32;
@@ -200,6 +201,22 @@ function model(): string {
   if (/iPhone/.test(ua)) return "iPhone";
   if (/iPad/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1)) return "iPad";
   return "";
+}
+
+/**
+ * Saves to the website's own storage; if that is unavailable, to the NE-PULSE
+ * network server instead (same request, same answer), so no test is lost.
+ */
+async function postResearch(kind: "survey" | "volunteer", body: unknown): Promise<Response> {
+  const init = { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) };
+  try {
+    const r = await fetch(`/api/${kind}`, init);
+    if (r.status < 500) return r;
+  } catch {
+    // fall through to the network server
+  }
+  await backendReady;
+  return fetch(`${API_URL}/api/v1/${kind}`, init);
 }
 
 function testerId(): string {
@@ -403,12 +420,7 @@ export default function PhoneTest() {
     try {
       const r = rec.current;
       const cohort = new URLSearchParams(window.location.search).get("class") ?? "";
-      // Stored by the website itself (Vercel), so the test works whether or
-      // not the NE-PULSE network server is running.
-      const resp = await fetch("/api/survey", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+      const resp = await postResearch("survey", {
           platform: /Android/i.test(navigator.userAgent) ? "android" : isIOS() ? "ios" : "other",
           model: model(),
           lang,
@@ -421,7 +433,6 @@ export default function PhoneTest() {
           answers: a,
           tester: testerId(),
           meta: { ...meta.current, inApp: !!inApp, samples: r.dt.length },
-        }),
       });
       if (!resp.ok) throw new Error();
       setRes(await resp.json());
@@ -436,11 +447,7 @@ export default function PhoneTest() {
     if (!/^[A-Za-z][A-Za-z0-9_]{3,31}$/.test(h)) return setTeamErr(true);
     setTeamErr(false);
     try {
-      const r = await fetch("/api/volunteer", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ handle: h, platform: /Android/i.test(navigator.userAgent) ? "android" : isIOS() ? "ios" : "other", age: answers.age ?? "", lang }),
-      });
+      const r = await postResearch("volunteer", { handle: h, platform: /Android/i.test(navigator.userAgent) ? "android" : isIOS() ? "ios" : "other", age: answers.age ?? "", lang });
       if (r.status === 400) return setTeamErr(true);
       if (!r.ok) throw new Error();
       setJoined(true);

@@ -89,7 +89,18 @@ export default function ResearchAdmin() {
       if (sv.ok) setSurveys((await sv.json()).responses ?? []);
       const vo = await fetch(`/api/admin/volunteers`, { headers: { Authorization: `Bearer ${token}` }, cache: "no-store" });
       if (vo.ok) setVols((await vo.json()).volunteers ?? []);
-    } catch {}
+      if (!sv.ok || !vo.ok) throw new Error("site storage unavailable");
+    } catch {
+      // Fall back to the copy on the NE-PULSE network server.
+      await backendReady;
+      try {
+        const h = { headers: { Authorization: `Bearer ${token}` }, cache: "no-store" as const };
+        const sv = await fetch(`${API_URL}/api/admin/survey`, h);
+        if (sv.ok) setSurveys((await sv.json()).responses ?? []);
+        const vo = await fetch(`${API_URL}/api/admin/volunteers`, h);
+        if (vo.ok) setVols((await vo.json()).volunteers ?? []);
+      } catch {}
+    }
     await backendReady;
     try {
       const r = await fetch(`${API_URL}/api/admin/research?cohort=${encodeURIComponent(cohort)}`, { headers: { Authorization: `Bearer ${token}` }, cache: "no-store" });
@@ -111,7 +122,7 @@ export default function ResearchAdmin() {
 
   useEffect(() => {
     load();
-    const id = setInterval(load, 30000);
+    const id = setInterval(load, 300000); // every 5 min: storage operations are limited
     return () => clearInterval(id);
   }, [load]);
 
