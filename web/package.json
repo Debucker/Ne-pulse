@@ -17,6 +17,7 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@vercel/blob": "2.8.1",
     "framer-motion": "^11.15.0",
     "leaflet": "^1.9.4",
     "lucide-react": "^0.468.0",

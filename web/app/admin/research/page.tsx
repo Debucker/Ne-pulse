@@ -76,6 +76,20 @@ export default function ResearchAdmin() {
 
   const load = useCallback(async () => {
     if (!token) return;
+    // The survey lives on the website itself, so it loads even when the
+    // network server (the laptop) is off.
+    try {
+      const sv = await fetch(`/api/admin/survey`, { headers: { Authorization: `Bearer ${token}` }, cache: "no-store" });
+      if (sv.status === 401) {
+        setToken("");
+        sessionStorage.removeItem(K_TOKEN);
+        setErr("Wrong admin token.");
+        return;
+      }
+      if (sv.ok) setSurveys((await sv.json()).responses ?? []);
+      const vo = await fetch(`/api/admin/volunteers`, { headers: { Authorization: `Bearer ${token}` }, cache: "no-store" });
+      if (vo.ok) setVols((await vo.json()).volunteers ?? []);
+    } catch {}
     await backendReady;
     try {
       const r = await fetch(`${API_URL}/api/admin/research?cohort=${encodeURIComponent(cohort)}`, { headers: { Authorization: `Bearer ${token}` }, cache: "no-store" });
@@ -88,10 +102,7 @@ export default function ResearchAdmin() {
       setData(await r.json());
       const c = await fetch(`${API_URL}/api/admin/credits`, { headers: { Authorization: `Bearer ${token}` }, cache: "no-store" });
       if (c.ok) setPeople((await c.json()).people ?? []);
-      const sv = await fetch(`${API_URL}/api/admin/survey`, { headers: { Authorization: `Bearer ${token}` }, cache: "no-store" });
-      if (sv.ok) setSurveys((await sv.json()).responses ?? []);
-      const vo = await fetch(`${API_URL}/api/admin/volunteers`, { headers: { Authorization: `Bearer ${token}` }, cache: "no-store" });
-      if (vo.ok) setVols((await vo.json()).volunteers ?? []);
+
       setErr(null);
     } catch (e) {
       setErr((e as Error).message);
@@ -145,79 +156,8 @@ export default function ResearchAdmin() {
     rows.map((r) => [r.night, r.device, r.hours, r.eligible, Math.round(r.from), Math.round(r.to), r.platform, r.rateHz ?? "", r.noiseMin ?? "", r.noiseMax ?? "", (r.flags ?? []).join(" ")].join(",")).join("\n") +
     "\n";
 
-  return (
-    <main className="mx-auto max-w-page px-4 pb-20 pt-8 sm:px-6">
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <div className="label">Research admin</div>
-          <h1 className="mt-1 font-display text-3xl font-bold">Class {data?.cohort || cohort}</h1>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <input value={cohort} onChange={(e) => setCohort(e.target.value.toUpperCase())} className="mono h-10 w-32 rounded-lg border border-rule-strong bg-ground px-3 text-ink" />
-          <Link href="/admin" className="btn btn-ghost !min-h-[40px] text-sm">
-            Network admin
-          </Link>
-        </div>
-      </div>
-      {err && <p className="mt-3 text-sm text-bad">{err}</p>}
-
-      {data && (
-        <>
-          <div className="mt-6 grid grid-cols-2 gap-px overflow-hidden rounded-xl bg-rule sm:grid-cols-4">
-            {[
-              ["Joined (phones)", data.joined],
-              ["Nights so far", data.nights.length],
-              ["Full nights", data.nights.reduce((a, n) => a + n.eligible, 0)],
-              ["Recordings", `${(data.recordingBytes / 2 ** 30).toFixed(2)} GB${data.recordingFull ? " · FULL" : ""}`],
-            ].map(([k, v]) => (
-              <div key={k} className="bg-panel p-4">
-                <div className="label">{k}</div>
-                <div className={`mono mt-1 text-2xl ${String(v).includes("FULL") ? "text-bad" : "text-ink"}`}>{v}</div>
-              </div>
-            ))}
-          </div>
-
-          <h2 className="mt-8 text-lg font-semibold">Nights</h2>
-          <div className="mt-2 overflow-x-auto rounded-xl border border-rule">
-            <table className="w-full text-sm">
-              <thead className="bg-panel text-left text-ink-3">
-                <tr>
-                  {["Night (evening of)", "Phones listened", `Full (≥ ${data.minHours} h)`, "Flagged", "Phone-hours", ""].map((h) => (
-                    <th key={h} className="label p-2.5 font-normal">
-                      {h}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {data.nights.map((n) => (
-                  <tr key={n.night} className="border-t border-rule">
-                    <td className="mono p-2.5">
-                      {n.night}
-                      {n.night === data.tonight ? " (tonight)" : ""}
-                    </td>
-                    <td className="mono p-2.5">{n.phones}</td>
-                    <td className="mono p-2.5 text-ok">{n.eligible}</td>
-                    <td className="mono p-2.5 text-warn">{n.flagged}</td>
-                    <td className="mono p-2.5">{n.hours}</td>
-                    <td className="p-2.5">
-                      <button className="chip" onClick={() => setNight(night === n.night ? "" : n.night)}>
-                        {night === n.night ? "show all" : "show"}
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-                {!data.nights.length && (
-                  <tr>
-                    <td colSpan={6} className="p-4 text-ink-3">
-                      No listening yet. Nights appear as soon as phones lie still.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-
+  const surveyBlock = (
+    <>
           <div className="mt-8 flex flex-wrap items-end justify-between gap-3">
             <h2 className="text-lg font-semibold">
               Phone test (survey) <span className="text-sm text-ink-3">({surveys.length} responses · {surveys.filter((r) => r.noiseMms2 > 0).length} measured)</span>
@@ -355,6 +295,85 @@ export default function ResearchAdmin() {
               </tbody>
             </table>
           </div>
+
+    </>
+  );
+
+  return (
+    <main className="mx-auto max-w-page px-4 pb-20 pt-8 sm:px-6">
+      <div className="flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <div className="label">Research admin</div>
+          <h1 className="mt-1 font-display text-3xl font-bold">Class {data?.cohort || cohort}</h1>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <input value={cohort} onChange={(e) => setCohort(e.target.value.toUpperCase())} className="mono h-10 w-32 rounded-lg border border-rule-strong bg-ground px-3 text-ink" />
+          <Link href="/admin" className="btn btn-ghost !min-h-[40px] text-sm">
+            Network admin
+          </Link>
+        </div>
+      </div>
+      {err && <p className="mt-3 text-sm text-bad">{err}</p>}
+      {!data && surveyBlock}
+
+      {data && (
+        <>
+          <div className="mt-6 grid grid-cols-2 gap-px overflow-hidden rounded-xl bg-rule sm:grid-cols-4">
+            {[
+              ["Joined (phones)", data.joined],
+              ["Nights so far", data.nights.length],
+              ["Full nights", data.nights.reduce((a, n) => a + n.eligible, 0)],
+              ["Recordings", `${(data.recordingBytes / 2 ** 30).toFixed(2)} GB${data.recordingFull ? " · FULL" : ""}`],
+            ].map(([k, v]) => (
+              <div key={k} className="bg-panel p-4">
+                <div className="label">{k}</div>
+                <div className={`mono mt-1 text-2xl ${String(v).includes("FULL") ? "text-bad" : "text-ink"}`}>{v}</div>
+              </div>
+            ))}
+          </div>
+
+          <h2 className="mt-8 text-lg font-semibold">Nights</h2>
+          <div className="mt-2 overflow-x-auto rounded-xl border border-rule">
+            <table className="w-full text-sm">
+              <thead className="bg-panel text-left text-ink-3">
+                <tr>
+                  {["Night (evening of)", "Phones listened", `Full (≥ ${data.minHours} h)`, "Flagged", "Phone-hours", ""].map((h) => (
+                    <th key={h} className="label p-2.5 font-normal">
+                      {h}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {data.nights.map((n) => (
+                  <tr key={n.night} className="border-t border-rule">
+                    <td className="mono p-2.5">
+                      {n.night}
+                      {n.night === data.tonight ? " (tonight)" : ""}
+                    </td>
+                    <td className="mono p-2.5">{n.phones}</td>
+                    <td className="mono p-2.5 text-ok">{n.eligible}</td>
+                    <td className="mono p-2.5 text-warn">{n.flagged}</td>
+                    <td className="mono p-2.5">{n.hours}</td>
+                    <td className="p-2.5">
+                      <button className="chip" onClick={() => setNight(night === n.night ? "" : n.night)}>
+                        {night === n.night ? "show all" : "show"}
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+                {!data.nights.length && (
+                  <tr>
+                    <td colSpan={6} className="p-4 text-ink-3">
+                      No listening yet. Nights appear as soon as phones lie still.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          {surveyBlock}
 
           <div className="mt-8 flex flex-wrap items-end justify-between gap-3">
             <h2 className="text-lg font-semibold">

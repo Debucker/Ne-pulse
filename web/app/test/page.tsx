@@ -9,7 +9,6 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { ArrowLeft, Hand, ListChecks, Share2, RotateCcw, Smartphone, Timer, Trophy } from "lucide-react";
-import { API_URL, backendReady } from "@/lib/config";
 import { inAppBrowser, isIOS, requestMotionPermission } from "@/lib/sensor/client";
 import { useT } from "@/lib/i18n";
 
@@ -402,10 +401,11 @@ export default function PhoneTest() {
     setPhase("send");
     setErr(null);
     try {
-      await backendReady;
       const r = rec.current;
       const cohort = new URLSearchParams(window.location.search).get("class") ?? "";
-      const resp = await fetch(API_URL + "/api/v1/survey", {
+      // Stored by the website itself (Vercel), so the test works whether or
+      // not the NE-PULSE network server is running.
+      const resp = await fetch("/api/survey", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -436,8 +436,7 @@ export default function PhoneTest() {
     if (!/^[A-Za-z][A-Za-z0-9_]{3,31}$/.test(h)) return setTeamErr(true);
     setTeamErr(false);
     try {
-      await backendReady;
-      const r = await fetch(API_URL + "/api/v1/volunteer", {
+      const r = await fetch("/api/volunteer", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ handle: h, platform: /Android/i.test(navigator.userAgent) ? "android" : isIOS() ? "ios" : "other", age: answers.age ?? "", lang }),
