@@ -91,6 +91,7 @@ const TEXT = {
     errNoSensor: "This browser gives no motion data. Open the link on a phone, in Safari (iPhone) or Chrome (Android).",
     errDenied: "Motion access was refused. Close this page completely, open the link again and tap Allow.",
     errSend: "Could not send. Check the internet and tap the button again.",
+    pending: "Your test is saved on your phone. The research server is busy right now, so it will be sent automatically: keep this page open for a minute, or open ne-pulse.com/test again later.",
     sendAgain: "Send again",
     teamT: "Join the night team?",
     teamLead: "You said you would leave your phone on overnight. Here is how it works:",
@@ -171,6 +172,7 @@ const TEXT = {
     errNoSensor: "Этот браузер не даёт данные движения. Открой ссылку на телефоне в Safari (iPhone) или Chrome (Android).",
     errDenied: "Доступ к датчику запрещён. Полностью закрой страницу, открой ссылку снова и нажми «Разрешить».",
     errSend: "Не удалось отправить. Проверь интернет и нажми кнопку ещё раз.",
+    pending: "Твой тест сохранён на телефоне. Сервер исследования сейчас занят, поэтому тест отправится автоматически: подержи эту страницу открытой минуту или открой ne-pulse.com/test позже.",
     sendAgain: "Отправить ещё раз",
     teamT: "Присоединишься к ночной команде?",
     teamLead: "Ты ответил(а), что оставил(а) бы телефон на ночь. Вот как это будет:",
@@ -191,7 +193,7 @@ const TEXT = {
 };
 
 type Phase = "intro" | "perm" | "place" | "measure" | "hidden" | "questions" | "send" | "team" | "result";
-type Result = { measured: boolean; betterThanPct: number; tested: number; detMmi: number };
+type Result = { measured: boolean; betterThanPct: number; tested: number; detMmi: number; pending?: boolean };
 type WakeLock = { release: () => Promise<void> };
 
 function model(): string {
@@ -217,6 +219,32 @@ async function postResearch(kind: "survey" | "volunteer", body: unknown): Promis
   }
   await backendReady;
   return fetch(`${API_URL}/api/v1/${kind}`, init);
+}
+
+// A test that could not be sent waits on the phone and is sent again later,
+// so a server outage never loses someone's 30 seconds.
+const K_PENDING = "nepulse.pendingTest";
+
+function keepPending(body: unknown) {
+  try {
+    localStorage.setItem(K_PENDING, JSON.stringify(body));
+  } catch {}
+}
+
+async function flushPending(): Promise<Response | null> {
+  let body: unknown = null;
+  try {
+    const raw = localStorage.getItem(K_PENDING);
+    if (raw) body = JSON.parse(raw);
+  } catch {}
+  if (!body) return null;
+  try {
+    const r = await postResearch("survey", body);
+    if (r.ok || r.status === 400) localStorage.removeItem(K_PENDING);
+    return r.ok ? r : null;
+  } catch {
+    return null;
+  }
 }
 
 function testerId(): string {
@@ -257,6 +285,7 @@ export default function PhoneTest() {
 
   useEffect(() => {
     setInApp(inAppBrowser());
+    flushPending(); // a test from an earlier visit that could not be sent
     setAndroid(/Android/i.test(navigator.userAgent));
     return () => stopRef.current();
   }, []);
@@ -420,7 +449,7 @@ export default function PhoneTest() {
     try {
       const r = rec.current;
       const cohort = new URLSearchParams(window.location.search).get("class") ?? "";
-      const resp = await postResearch("survey", {
+      const body = {
           platform: /Android/i.test(navigator.userAgent) ? "android" : isIOS() ? "ios" : "other",
           model: model(),
           lang,
@@ -433,8 +462,25 @@ export default function PhoneTest() {
           answers: a,
           tester: testerId(),
           meta: { ...meta.current, inApp: !!inApp, samples: r.dt.length },
-      });
-      if (!resp.ok) throw new Error();
+      };
+      let resp: Response | null = null;
+      try {
+        resp = await postResearch("survey", body);
+      } catch {}
+      if (!resp || !resp.ok) {
+        keepPending(body);
+        // Keep trying while the page is open.
+        const retry = setInterval(async () => {
+          const ok = await flushPending();
+          if (ok) {
+            clearInterval(retry);
+            setRes(await ok.json());
+          }
+        }, 20000);
+        setRes({ measured: false, betterThanPct: 0, tested: 0, detMmi: 0, pending: true });
+        setPhase(a.overnight === "yes" && !joined ? "team" : "result");
+        return;
+      }
       setRes(await resp.json());
       setPhase(a.overnight === "yes" && !joined ? "team" : "result");
     } catch {
@@ -663,7 +709,9 @@ export default function PhoneTest() {
           {joined && <p className="mb-4 rounded-xl border border-ok/50 bg-ok/10 p-4 text-lg text-ink">✓ {L.teamOk}</p>}
           <div className="glass mt-4 p-6 text-center">
             <div className="label">{L.resultKicker}</div>
-            {res.measured ? (
+            {res.pending ? (
+              <p className="mt-3 text-lg text-ink">{L.pending}</p>
+            ) : res.measured ? (
               <>
                 <div className="mt-3 font-display text-[clamp(2rem,8vw,2.8rem)] font-extrabold leading-tight text-cyan">
                   {res.tested > 1 ? L.better.replace("{p}", String(res.betterThanPct)) : L.first}
@@ -673,7 +721,7 @@ export default function PhoneTest() {
             ) : (
               <p className="mt-3 text-lg text-ink">{L.notMeasured}</p>
             )}
-            <p className="mono mt-4 text-sm text-ink-3">{L.tested.replace("{n}", String(Math.max(res.tested, 1)))}</p>
+            {!res.pending && <p className="mono mt-4 text-sm text-ink-3">{L.tested.replace("{n}", String(Math.max(res.tested, 1)))}</p>}
           </div>
           <p className="mt-5 text-center text-lg text-ink-2">{L.thanks}</p>
           <button className={`${big} mt-6`} onClick={share}>
