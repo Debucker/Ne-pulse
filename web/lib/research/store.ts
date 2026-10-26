@@ -1,11 +1,9 @@
-// Research storage in a private Vercel Blob store, so the phone test runs
-// without the NE-PULSE server (or any laptop) being on.
-//
-//   survey/rec/<id>.json                 the full response, raw samples included
-//   survey/idx/<id>__<noise 0.1 mm/s²>   empty marker: ranking without reading every response
-//   volunteers/<handle>.json             night-team sign-ups, kept apart from the answers
+// Research storage in a free Neon Postgres database (added through Vercel),
+// so the phone test runs without the NE-PULSE server (or any laptop) being on.
+// One row per test (raw samples included) and one per night-team volunteer;
+// the volunteers table is separate so the survey answers stay anonymous.
 
-import { get, list, put } from "@vercel/blob";
+import { neon } from "@neondatabase/serverless";
 
 export type SurveyRecord = {
   id: string;
@@ -28,64 +26,61 @@ export type SurveyRecord = {
 
 export type Volunteer = { handle: string; created: number; platform: string; age: string; lang: string };
 
-const opts = { access: "private" as const, addRandomSuffix: false, allowOverwrite: true };
+function db() {
+  const url = process.env.DATABASE_URL;
+  if (!url) throw new Error("DATABASE_URL is not set");
+  return neon(url);
+}
 
 export async function saveSurvey(r: SurveyRecord) {
-  await put(`survey/rec/${r.id}.json`, JSON.stringify(r), { ...opts, contentType: "application/json" });
-  if (r.cohort !== "CITEST") {
-    await put(`survey/idx/${r.id}__${Math.round(r.noiseMms2 * 10)}`, "1", { ...opts, contentType: "text/plain" });
-  }
+  const sql = db();
+  await sql`INSERT INTO surveys (id, created, platform, model, lang, cohort, rate_hz, noise_mms2, resolution_mms2, jitter_ms, still_sec, det_mmi, answers, tester, meta, raw)
+    VALUES (${r.id}, ${r.created}, ${r.platform}, ${r.model}, ${r.lang}, ${r.cohort}, ${r.rateHz}, ${r.noiseMms2}, ${r.resolutionMms2}, ${r.jitterMs},
+      ${r.stillSec}, ${r.detMmi}, ${JSON.stringify(r.answers)}::jsonb, ${r.tester}, ${JSON.stringify(r.meta)}::jsonb, ${JSON.stringify(r.raw)}::jsonb)
+    ON CONFLICT (id) DO NOTHING`;
 }
 
-async function listAll(prefix: string) {
-  const out: { pathname: string }[] = [];
-  let cursor: string | undefined;
-  do {
-    const page = await list({ prefix, cursor, limit: 1000 });
-    out.push(...page.blobs);
-    cursor = page.hasMore ? page.cursor : undefined;
-  } while (cursor);
-  return out;
-}
-
-/** Noise of every measured phone (mm/s²), from the index markers. */
+/** Noise of every measured phone (mm/s²), for the ranking. */
 export async function surveyNoises(): Promise<{ id: string; noise: number }[]> {
-  const blobs = await listAll("survey/idx/");
-  return blobs.map((b) => {
-    const [id, n] = b.pathname.slice("survey/idx/".length).split("__");
-    return { id, noise: Number(n) / 10 };
-  });
+  const rows = await db()`SELECT id, noise_mms2 FROM surveys WHERE cohort <> 'CITEST' AND noise_mms2 > 0`;
+  return rows.map((r) => ({ id: r.id as string, noise: Number(r.noise_mms2) }));
 }
 
-async function readJSON<T>(pathname: string): Promise<T | null> {
-  const r = await get(pathname, { access: "private", useCache: false });
-  if (!r || r.statusCode !== 200) return null;
-  return JSON.parse(await new Response(r.stream).text()) as T;
-}
-
-/** Every stored response (raw samples dropped unless asked for). */
+/** Every stored response, newest first (raw samples only when asked for). */
 export async function allSurveys(withRaw = false): Promise<SurveyRecord[]> {
-  const blobs = await listAll("survey/rec/");
-  const out: SurveyRecord[] = [];
-  for (let i = 0; i < blobs.length; i += 16) {
-    const chunk = await Promise.all(blobs.slice(i, i + 16).map((b) => readJSON<SurveyRecord>(b.pathname)));
-    for (const r of chunk) {
-      if (!r || r.cohort === "CITEST") continue;
-      if (!withRaw) r.raw = { t0: r.raw?.t0 ?? 0, dt: [], x: [], y: [], z: [] };
-      out.push(r);
-    }
-  }
-  return out.sort((a, b) => b.created - a.created);
+  const sql = db();
+  const rows = withRaw
+    ? await sql`SELECT * FROM surveys WHERE cohort <> 'CITEST' ORDER BY created DESC`
+    : await sql`SELECT id, created, platform, model, lang, cohort, rate_hz, noise_mms2, resolution_mms2, jitter_ms, still_sec, det_mmi, answers, tester, meta
+        FROM surveys WHERE cohort <> 'CITEST' ORDER BY created DESC`;
+  return rows.map((r) => ({
+    id: r.id,
+    created: Number(r.created),
+    platform: r.platform,
+    model: r.model,
+    lang: r.lang,
+    cohort: r.cohort,
+    rateHz: Number(r.rate_hz),
+    noiseMms2: Number(r.noise_mms2),
+    resolutionMms2: Number(r.resolution_mms2),
+    jitterMs: Number(r.jitter_ms),
+    stillSec: Number(r.still_sec),
+    detMmi: Number(r.det_mmi),
+    answers: r.answers ?? {},
+    tester: r.tester,
+    meta: r.meta ?? {},
+    raw: withRaw ? r.raw : { t0: 0, dt: [], x: [], y: [], z: [] },
+  }));
 }
 
 export async function saveVolunteer(v: Volunteer) {
-  await put(`volunteers/${v.handle.toLowerCase()}.json`, JSON.stringify(v), { ...opts, contentType: "application/json" });
+  await db()`INSERT INTO volunteers (handle, created, platform, age, lang) VALUES (${v.handle}, ${v.created}, ${v.platform}, ${v.age}, ${v.lang})
+    ON CONFLICT (handle) DO UPDATE SET created = EXCLUDED.created, platform = EXCLUDED.platform, age = EXCLUDED.age, lang = EXCLUDED.lang`;
 }
 
 export async function allVolunteers(): Promise<Volunteer[]> {
-  const blobs = await listAll("volunteers/");
-  const vs = await Promise.all(blobs.map((b) => readJSON<Volunteer>(b.pathname)));
-  return vs.filter((v): v is Volunteer => !!v).sort((a, b) => a.created - b.created);
+  const rows = await db()`SELECT handle, created, platform, age, lang FROM volunteers ORDER BY created`;
+  return rows.map((r) => ({ handle: r.handle, created: Number(r.created), platform: r.platform, age: r.age, lang: r.lang }));
 }
 
 /** Admin requests carry "Authorization: Bearer <NEPULSE_ADMIN_TOKEN>". */
